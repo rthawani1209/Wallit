@@ -12,7 +12,8 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, nullable=False, index=True)
-    password_hash = Column(String, nullable=False)
+    # Nullable — a user who signed up via Google/Apple has no local password
+    password_hash = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # Plaid access token stored encrypted — never log this field
     plaid_access_token = Column(Text, nullable=True)
@@ -20,3 +21,4 @@ class User(Base):
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     plans = relationship("Plan", back_populates="user", cascade="all, delete-orphan")
     bills = relationship("Bill", back_populates="user", cascade="all, delete-orphan")
+    linked_identities = relationship("LinkedIdentity", back_populates="user", cascade="all, delete-orphan")

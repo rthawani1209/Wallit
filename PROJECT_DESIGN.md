@@ -150,7 +150,7 @@ Starting point — refine as needed, but don't wildly diverge without explaining
 Real multi-user auth, not a single hardcoded user. Recommended approach for this stack:
 - **Password auth:** user signs up with email + password. Password is hashed with bcrypt (never stored in plain text, never logged).
 - **Sessions:** on login, issue a JWT (JSON Web Token) — a signed token the frontend stores and sends with each request to prove who's logged in, so the user isn't re-entering their password on every page.
-- **Optional, nice-to-have:** "Sign in with Google" via OAuth, in addition to email/password — not required for v1, can be added later.
+- **Multi-provider auth, built in from Phase 1 (decided during Phase 1 implementation):** email/password AND "Sign in with Google"/"Sign in with Apple" are all first-class from the start, not deferred. `User.password_hash` is nullable (OAuth-only users have none). A separate `linked_identities` table holds one row per external provider linked to a user (`provider` + `provider_user_id`, unique together), so a single user can link multiple providers over time.
 - **Every backend query is scoped to the logged-in user's `user_id`.** This is the actual security boundary that keeps User A from ever seeing User B's data — enforce it consistently, not just on some endpoints.
 - **Frontend route protection:** pages like the dashboard, plans, and settings should redirect to login if there's no valid session — same "protected route" pattern already planned for other parts of the app.
 - This is genuinely standard, well-documented territory (FastAPI has established patterns for JWT auth, e.g. via `fastapi-users` or a hand-rolled implementation with `passlib` + `python-jose`) — Claude Code should walk through the choice of library vs. hand-rolled when we get to Phase 1.
@@ -159,9 +159,17 @@ Real multi-user auth, not a single hardcoded user. Recommended approach for this
 users
   id (uuid, PK)
   email (unique)
-  password_hash (bcrypt — never store plain text)
+  password_hash (bcrypt — never store plain text; nullable, OAuth-only users have none)
   created_at
   plaid_access_token (encrypted at rest — never log this; nullable until they connect a bank)
+
+linked_identities
+  id (uuid, PK)
+  user_id (FK -> users.id)
+  provider ('google', 'apple', etc.)
+  provider_user_id (the provider's unique ID for this user)
+  created_at
+  unique(provider, provider_user_id)
 
 accounts
   id (uuid, PK)
