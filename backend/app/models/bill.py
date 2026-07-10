@@ -14,7 +14,7 @@ class Bill(Base):
     source_subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=True)
     name = Column(String, nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
-    due_date = Column(Date, nullable=False, index=True)
+    due_date = Column(Date, nullable=False)
 
     user = relationship("User", back_populates="bills")
 

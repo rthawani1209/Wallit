@@ -22,3 +22,4 @@ class User(Base):
     plans = relationship("Plan", back_populates="user", cascade="all, delete-orphan")
     bills = relationship("Bill", back_populates="user", cascade="all, delete-orphan")
     linked_identities = relationship("LinkedIdentity", back_populates="user", cascade="all, delete-orphan")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
