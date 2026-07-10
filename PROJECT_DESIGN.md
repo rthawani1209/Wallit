@@ -214,6 +214,7 @@ plan_line_items
 
 subscriptions
   id (uuid, PK)
+  user_id (FK -> users.id)
   transaction_pattern_id -- links to the recurring transaction group it was detected from
   merchant_name
   amount
