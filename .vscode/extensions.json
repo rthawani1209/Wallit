@@ -1,0 +1,40 @@
+{
+  "recommendations": [
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "ms-python.vscode-python-envs",
+    "donjayamanne.python-environment-manager",
+    "donjayamanne.python-extension-pack",
+    "kevinrose.vsc-python-indent",
+    "njpwerner.autodocstring",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // JavaScript / TypeScript / Frontend
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "xabikos.javascriptsnippets",
+    "dsznajder.es7-react-js-snippets",
+
+    // HTML / CSS
+    "ecmel.vscode-html-css",
+    "pranaygp.vscode-css-peek",
+    "bianxianyang.htmlplay",
+    "ritwickdey.liveserver",
+
+    // Database
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+
+    // API testing
+    "humao.rest-client",
+
+    // Git / GitHub
+    "eamodio.gitlens",
+    "github.vscode-github-actions"
+  ]
+}
