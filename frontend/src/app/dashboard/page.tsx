@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
-import { api, Account, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Transaction } from "@/lib/api";
+import { api, Account, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Transaction, UpcomingBill } from "@/lib/api";
 import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,6 +12,7 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { SpendChart } from "@/components/dashboard/SpendChart";
 import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { BudgetProgress } from "@/components/dashboard/BudgetProgress";
+import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const [spendSummary, setSpendSummary] = useState<CategorySpend[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlowMonth[]>([]);
   const [budgetProgress, setBudgetProgress] = useState<BudgetProgressData[]>([]);
+  const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -81,6 +83,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user || !plaidLinked) return;
     api.budgets.getProgress().then(setBudgetProgress).catch(() => {});
+  }, [user, plaidLinked]);
+
+  useEffect(() => {
+    if (!user || !plaidLinked) return;
+    api.transactions.getUpcomingBills().then(setUpcomingBills).catch(() => {});
   }, [user, plaidLinked]);
 
   async function handleSetBudget(categoryId: string, limit: number) {
@@ -207,7 +214,10 @@ export default function DashboardPage() {
                     onCategoryChange={handleCategoryChange}
                   />
                 </div>
-                <BudgetProgress data={budgetProgress} onSetLimit={handleSetBudget} />
+                <div className="space-y-5">
+                  <BudgetProgress data={budgetProgress} onSetLimit={handleSetBudget} />
+                  <UpcomingBills data={upcomingBills} />
+                </div>
                 <div className="md:col-span-3">
                   <WhatIfSimulator
                     categories={categories}

@@ -1,4 +1,5 @@
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func
@@ -10,7 +11,13 @@ from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.schemas.transactions import CashFlowMonth, CategorySpend, TransactionResponse, TransactionUpdateRequest
+from app.schemas.transactions import (
+    CashFlowMonth,
+    CategorySpend,
+    TransactionResponse,
+    TransactionUpdateRequest,
+    UpcomingBill,
+)
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -159,3 +166,69 @@ def get_cashflow(
             )
         )
     return result
+
+
+# Categories that represent fixed recurring obligations rather than variable day-to-day
+# spend — a merchant that happens to repeat monthly (e.g. a regular coffee run) shouldn't
+# show up as a "bill" just because the amount and cadence look consistent.
+BILL_LIKE_CATEGORIES = {"Subscriptions", "Utilities", "Housing", "Debt"}
+
+
+@router.get("/upcoming-bills", response_model=list[UpcomingBill])
+def get_upcoming_bills(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Detects recurring monthly charges (2+ occurrences of the same merchant at a
+    roughly-monthly cadence and consistent amount, in a bill-like category) from
+    transaction history and predicts each one's next due date — no separate
+    bill-entry step required.
+    """
+    account_ids = _user_account_ids(db, current_user.id)
+    lookback_start = date.today() - timedelta(days=120)
+
+    txns = (
+        db.query(Transaction)
+        .join(Category, Transaction.category_id == Category.id)
+        .filter(
+            Transaction.account_id.in_(account_ids),
+            Transaction.date >= lookback_start,
+            Transaction.amount > 0,
+            Transaction.merchant_name.isnot(None),
+            Category.name.in_(BILL_LIKE_CATEGORIES),
+        )
+        .order_by(Transaction.date)
+        .all()
+    )
+
+    by_merchant: dict[str, list[Transaction]] = defaultdict(list)
+    for t in txns:
+        by_merchant[t.merchant_name].append(t)
+
+    today = date.today()
+    bills = []
+    for merchant, occurrences in by_merchant.items():
+        if len(occurrences) < 2:
+            continue
+        amounts = [float(t.amount) for t in occurrences]
+        avg_amount = sum(amounts) / len(amounts)
+        # Wildly inconsistent amounts mean this is a repeat purchase, not a fixed bill.
+        if any(abs(a - avg_amount) > avg_amount * 0.15 + 1 for a in amounts):
+            continue
+
+        intervals = [
+            (occurrences[i].date - occurrences[i - 1].date).days for i in range(1, len(occurrences))
+        ]
+        avg_interval = sum(intervals) / len(intervals)
+        # Only a roughly-monthly cadence counts as a recurring bill here.
+        if not (24 <= avg_interval <= 36):
+            continue
+
+        next_due = occurrences[-1].date + timedelta(days=round(avg_interval))
+        while next_due < today:
+            next_due += timedelta(days=round(avg_interval))
+        if next_due > today + timedelta(days=45):
+            continue
+
+        bills.append(UpcomingBill(merchant_name=merchant, amount=round(avg_amount, 2), next_due_date=next_due))
+
+    bills.sort(key=lambda b: b.next_due_date)
+    return bills[:8]

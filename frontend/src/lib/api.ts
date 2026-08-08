@@ -73,6 +73,8 @@ export const api = {
 
     getCashFlow: (months = 7) =>
       request<CashFlowMonth[]>(`/api/v1/transactions/cashflow?months=${months}`),
+
+    getUpcomingBills: () => request<UpcomingBill[]>("/api/v1/transactions/upcoming-bills"),
   },
 
   budgets: {
@@ -153,4 +155,10 @@ export interface BudgetProgress {
   limit: number;
   spent: number;
   is_custom: boolean;
+}
+
+export interface UpcomingBill {
+  merchant_name: string;
+  amount: number;
+  next_due_date: string; // YYYY-MM-DD
 }
