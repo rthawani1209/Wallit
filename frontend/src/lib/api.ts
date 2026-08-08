@@ -75,6 +75,16 @@ export const api = {
       request<CashFlowMonth[]>(`/api/v1/transactions/cashflow?months=${months}`),
   },
 
+  budgets: {
+    getProgress: () => request<BudgetProgress[]>("/api/v1/budgets/progress"),
+
+    set: (categoryId: string, limit: number) =>
+      request<BudgetProgress>(`/api/v1/budgets/${categoryId}`, {
+        method: "PUT",
+        body: JSON.stringify({ limit }),
+      }),
+  },
+
   categories: {
     getAll: () => request<Category[]>("/api/v1/categories"),
   },
@@ -135,4 +145,12 @@ export interface CashFlowMonth {
   label: string; // "Feb"
   income: number;
   expenses: number;
+}
+
+export interface BudgetProgress {
+  category_id: string;
+  category_name: string;
+  limit: number;
+  spent: number;
+  is_custom: boolean;
 }

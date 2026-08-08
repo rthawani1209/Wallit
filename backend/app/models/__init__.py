@@ -6,3 +6,4 @@ from app.models.category import Category
 from app.models.plan import Plan, PlanLineItem
 from app.models.subscription import Subscription
 from app.models.bill import Bill
+from app.models.budget import Budget
