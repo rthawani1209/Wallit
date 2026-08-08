@@ -20,6 +20,9 @@ class Transaction(Base):
     # transaction can be recategorized later without re-fetching from Plaid.
     plaid_category_primary = Column(String, nullable=True)
     plaid_category_detailed = Column(String, nullable=True)
+    # True once a user has manually picked a category for this transaction — a resync
+    # should never silently overwrite that choice back to the auto-resolved category.
+    category_is_manual = Column(Boolean, default=False, nullable=False)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=True, index=True)
     is_subscription = Column(Boolean, default=False, nullable=False)
     is_anomaly = Column(Boolean, default=False, nullable=False)

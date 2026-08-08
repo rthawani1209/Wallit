@@ -13,7 +13,8 @@ def save_transactions(
     """
     Insert new transactions and refresh categorization on existing ones (re-running a
     sync should also repair rows that were miscategorized by an earlier, partial sync —
-    not just skip them). Returns the number of rows touched.
+    not just skip them). Never overwrites category_id on a row the user has manually
+    recategorized. Returns the number of rows touched.
     """
     touched = 0
     for t in transactions:
@@ -35,7 +36,8 @@ def save_transactions(
             .first()
         )
         if existing:
-            existing.category_id = category_id
+            if not existing.category_is_manual:
+                existing.category_id = category_id
             existing.plaid_category_primary = plaid_primary
             existing.plaid_category_detailed = plaid_detailed
         else:

@@ -52,6 +52,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ public_token }),
       }),
+
+    resync: () =>
+      request<{ message: string; transactions_touched: number }>("/api/v1/plaid/resync", {
+        method: "POST",
+      }),
   },
 
   accounts: {

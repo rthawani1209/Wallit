@@ -35,6 +35,8 @@ export default function DashboardPage() {
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncedLabel, setLastSyncedLabel] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("this_month");
   const [customMonth, setCustomMonth] = useState(new Date().toISOString().slice(0, 7));
 
@@ -114,6 +116,27 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
+  async function handleResync() {
+    setSyncing(true);
+    try {
+      await api.plaid.resync();
+      const [accts, txns] = await Promise.all([api.accounts.getAll(), api.transactions.getAll()]);
+      setAccounts(accts);
+      setTransactions(txns);
+      await Promise.all([
+        api.transactions.getSummary(dateRange).then(setSpendSummary),
+        api.transactions.getCashFlow().then(setCashFlow),
+        api.budgets.getProgress().then(setBudgetProgress),
+        api.transactions.getUpcomingBills().then(setUpcomingBills),
+      ]);
+      setLastSyncedLabel("just now");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (!user || loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background">
@@ -132,6 +155,9 @@ export default function DashboardPage() {
         onLogout={handleLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onResync={handleResync}
+        syncing={syncing}
+        lastSyncedLabel={lastSyncedLabel}
       />
 
       <main className="flex-1 overflow-y-auto flex flex-col min-w-0 relative">

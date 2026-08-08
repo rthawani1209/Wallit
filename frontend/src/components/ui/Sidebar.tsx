@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, LogOut, Wallet } from "lucide-react";
+import { LayoutDashboard, LogOut, RefreshCw, Wallet } from "lucide-react";
 import type { Account } from "@/lib/api";
 
 interface SidebarProps {
@@ -9,6 +9,9 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
+  onResync: () => void;
+  syncing: boolean;
+  lastSyncedLabel: string | null;
 }
 
 const navItems = [{ icon: LayoutDashboard, label: "Dashboard" }];
@@ -31,7 +34,16 @@ function initials(email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: SidebarProps) {
+export function Sidebar({
+  userEmail,
+  accounts,
+  onLogout,
+  isOpen,
+  onClose,
+  onResync,
+  syncing,
+  lastSyncedLabel,
+}: SidebarProps) {
   return (
     <>
       {isOpen && (
@@ -107,6 +119,36 @@ export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: Side
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {accounts.length > 0 && (
+          <div className="mt-6 mx-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Sync
+              </span>
+              <span className="relative flex w-1.5 h-1.5">
+                {!syncing && (
+                  <span
+                    className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"
+                    style={{ animation: "auth-glow-pulse 2.5s ease-in-out infinite" }}
+                  />
+                )}
+                <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-primary" />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              {syncing ? "Syncing…" : lastSyncedLabel ? `Synced ${lastSyncedLabel}` : "Not synced yet"}
+            </p>
+            <button
+              onClick={onResync}
+              disabled={syncing}
+              className="w-full flex items-center justify-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing" : "Resync accounts"}
+            </button>
           </div>
         )}
       </nav>

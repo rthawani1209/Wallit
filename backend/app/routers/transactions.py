@@ -46,7 +46,8 @@ def update_transaction(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Manually assign a category to a transaction (Phase 2 — precedes Phase 3's auto-categorization)."""
+    """Manually assign a category to a transaction. Marked as a manual override so a
+    later Plaid resync never silently reverts it back to the auto-resolved category."""
     account_ids = _user_account_ids(db, current_user.id)
     transaction = (
         db.query(Transaction)
@@ -61,6 +62,7 @@ def update_transaction(
         raise HTTPException(status_code=400, detail="Invalid category")
 
     transaction.category_id = body.category_id
+    transaction.category_is_manual = True
     db.commit()
     db.refresh(transaction)
     return transaction
