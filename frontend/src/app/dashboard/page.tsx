@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { SpendChart } from "@/components/dashboard/SpendChart";
+import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
 
 const today = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -136,6 +137,9 @@ export default function DashboardPage() {
                 />
               </div>
               <SpendChart data={spendSummary} />
+              <div className="col-span-3">
+                <WhatIfSimulator categories={categories} />
+              </div>
             </div>
           )}
         </div>
