@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
-import { api, Account, Category, CategorySpend, Transaction } from "@/lib/api";
+import { api, Account, CashFlowMonth, Category, CategorySpend, Transaction } from "@/lib/api";
 import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { SpendChart } from "@/components/dashboard/SpendChart";
+import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [spendSummary, setSpendSummary] = useState<CategorySpend[]>([]);
+  const [cashFlow, setCashFlow] = useState<CashFlowMonth[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,6 +70,11 @@ export default function DashboardPage() {
     if (!user || !plaidLinked) return;
     api.transactions.getSummary(dateRange).then(setSpendSummary).catch(() => {});
   }, [user, plaidLinked, dateRange]);
+
+  useEffect(() => {
+    if (!user || !plaidLinked) return;
+    api.transactions.getCashFlow().then(setCashFlow).catch(() => {});
+  }, [user, plaidLinked]);
 
   function handleCategoryChange(transactionId: string, categoryId: string) {
     setTransactions((prev) =>
@@ -173,13 +180,16 @@ export default function DashboardPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="md:col-span-2">
+                  <CashFlowChart data={cashFlow} />
+                </div>
+                <SpendChart data={spendSummary} periodLabel={currentPeriodLabel} />
+                <div className="md:col-span-2">
                   <TransactionList
                     transactions={transactions}
                     categories={categories}
                     onCategoryChange={handleCategoryChange}
                   />
                 </div>
-                <SpendChart data={spendSummary} periodLabel={currentPeriodLabel} />
                 <div className="md:col-span-3">
                   <WhatIfSimulator
                     categories={categories}

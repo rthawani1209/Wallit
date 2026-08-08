@@ -70,6 +70,9 @@ export const api = {
       const qs = params.toString();
       return request<CategorySpend[]>(`/api/v1/transactions/summary${qs ? `?${qs}` : ""}`);
     },
+
+    getCashFlow: (months = 7) =>
+      request<CashFlowMonth[]>(`/api/v1/transactions/cashflow?months=${months}`),
   },
 
   categories: {
@@ -125,4 +128,11 @@ export interface SimulateResult {
 export interface DateRange {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
+}
+
+export interface CashFlowMonth {
+  month: string; // "2026-02"
+  label: string; // "Feb"
+  income: number;
+  expenses: number;
 }
