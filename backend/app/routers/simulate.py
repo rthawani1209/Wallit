@@ -51,8 +51,8 @@ def simulate(
         delta = projected_month_spend - actual_month_spend
 
     return SimulateResponse(
-        current_balance=current_balance,
-        actual_month_spend=actual_month_spend,
-        projected_month_spend=projected_month_spend,
-        projected_balance=current_balance - delta,
+        current_balance=round(current_balance, 2),
+        actual_month_spend=round(actual_month_spend, 2),
+        projected_month_spend=round(projected_month_spend, 2),
+        projected_balance=round(current_balance - delta, 2),
     )
