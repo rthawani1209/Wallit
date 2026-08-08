@@ -24,6 +24,9 @@ anthropic==0.40.0
 # Redis client
 redis==5.2.1
 
+# Background scheduling (nightly subscription/anomaly detection)
+apscheduler==3.10.4
+
 # Encryption (for Plaid access tokens stored in DB)
 cryptography==43.0.3
 

@@ -26,6 +26,9 @@ class Transaction(Base):
     plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=True, index=True)
     is_subscription = Column(Boolean, default=False, nullable=False)
     is_anomaly = Column(Boolean, default=False, nullable=False)
+    # Human-readable explanation for why this was flagged, e.g. "62% higher than your
+    # typical Food spend" or "Netflix price increased from $15.99 to $19.99".
+    anomaly_reason = Column(String, nullable=True)
 
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")

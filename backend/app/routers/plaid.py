@@ -9,7 +9,7 @@ from app.models.account import Account
 from app.models.category import Category
 from app.models.user import User
 from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse
-from app.services import encryption, plaid as plaid_service
+from app.services import detection, encryption, plaid as plaid_service
 from app.services.transaction_sync import save_transactions
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
@@ -81,6 +81,8 @@ def exchange_token(
     save_transactions(db, account_map, category_map, transactions)
     db.commit()
 
+    detection.run_detection(db, current_user.id)
+
     return {"message": "Bank connected and transactions synced"}
 
 
@@ -102,5 +104,7 @@ def resync(current_user: User = Depends(get_current_user), db: Session = Depends
     transactions = _fetch_all_transactions(access_token)
     touched = save_transactions(db, account_map, category_map, transactions)
     db.commit()
+
+    detection.run_detection(db, current_user.id)
 
     return {"message": "Resynced", "transactions_touched": touched}

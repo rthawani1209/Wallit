@@ -19,6 +19,7 @@ from app.schemas.transactions import (
     TransactionUpdateRequest,
     UpcomingBill,
 )
+from app.schemas.subscriptions import AnomalyResponse
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -235,3 +236,30 @@ def get_upcoming_bills(current_user: User = Depends(get_current_user), db: Sessi
 
     bills.sort(key=lambda b: b.next_due_date)
     return bills[:8]
+
+
+@router.get("/anomalies", response_model=list[AnomalyResponse])
+def get_anomalies(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Recent transactions flagged by detection.run_detection — unusually large for
+    their category, or a subscription price increase."""
+    account_ids = _user_account_ids(db, current_user.id)
+    category_names = {c.id: c.name for c in db.query(Category).all()}
+
+    txns = (
+        db.query(Transaction)
+        .filter(Transaction.account_id.in_(account_ids), Transaction.is_anomaly.is_(True))
+        .order_by(Transaction.date.desc())
+        .limit(20)
+        .all()
+    )
+    return [
+        AnomalyResponse(
+            id=t.id,
+            merchant_name=t.merchant_name,
+            amount=float(t.amount),
+            date=t.date,
+            category_name=category_names.get(t.category_id),
+            anomaly_reason=t.anomaly_reason,
+        )
+        for t in txns
+    ]
