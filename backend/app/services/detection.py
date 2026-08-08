@@ -121,10 +121,24 @@ def detect_subscriptions(db: Session, user_id) -> None:
         if len(occurrences) < 2:
             continue
         amounts = [float(t.amount) for t in occurrences]
-        avg_amount = sum(amounts) / len(amounts)
-        # Wildly inconsistent amounts mean this is a repeat purchase, not a fixed charge.
-        if any(abs(a - avg_amount) > avg_amount * 0.15 + 1 for a in amounts):
-            continue
+        # A real subscription price hike has a specific shape: a tightly consistent
+        # baseline of at least 3 prior charges, then ONE newer charge that jumped.
+        # Requiring 3+ baseline points (not 2) matters: a 2-point baseline is too easy
+        # to satisfy by chance for something that's just drifting continuously (e.g. a
+        # utility bill creeping up with usage/season) rather than genuinely a stable
+        # price that changed once. Below that, fall back to requiring every amount —
+        # baseline and latest alike — to be tightly consistent together.
+        if len(amounts) >= 4:
+            baseline, latest = amounts[:-1], amounts[-1]
+            baseline_avg = sum(baseline) / len(baseline)
+            baseline_consistent = all(abs(a - baseline_avg) <= baseline_avg * 0.15 + 1 for a in baseline)
+            latest_consistent = baseline_avg > 0 and abs(latest - baseline_avg) <= baseline_avg * 0.6
+            if not (baseline_consistent and latest_consistent):
+                continue
+        else:
+            avg_amount = sum(amounts) / len(amounts)
+            if any(abs(a - avg_amount) > avg_amount * 0.15 + 1 for a in amounts):
+                continue
 
         intervals = [
             (occurrences[i].date - occurrences[i - 1].date).days for i in range(1, len(occurrences))
