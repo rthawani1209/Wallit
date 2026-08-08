@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ class ExchangeTokenRequest(BaseModel):
 
 
 class AccountResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     name: str
     type: str
     current_balance: float | None
@@ -22,7 +23,7 @@ class AccountResponse(BaseModel):
 
 
 class TransactionResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     amount: float
     merchant_name: str | None
     date: date
