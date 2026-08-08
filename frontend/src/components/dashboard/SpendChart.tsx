@@ -26,18 +26,18 @@ function ChartTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
-export function SpendChart({ data }: { data: CategorySpend[] }) {
+export function SpendChart({ data, periodLabel }: { data: CategorySpend[]; periodLabel: string }) {
   const total = data.reduce((sum, d) => sum + d.total, 0);
 
   return (
     <Card className="p-6 flex flex-col">
       <div className="mb-4">
         <h2 className="font-semibold text-[15px] tracking-tight">Spending</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Month-to-date breakdown</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{periodLabel} breakdown</p>
       </div>
 
       {data.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No spending yet this month.</p>
+        <p className="text-muted-foreground text-sm">No spending in this period.</p>
       ) : (
         <>
           <div className="flex justify-center my-2">

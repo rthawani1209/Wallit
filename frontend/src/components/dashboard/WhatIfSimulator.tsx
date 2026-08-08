@@ -2,26 +2,32 @@
 
 import { useEffect, useState } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { api, Category, SimulateResult } from "@/lib/api";
+import { api, Category, DateRange, SimulateResult } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 
 function fmt(val: number) {
   return val.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-export function WhatIfSimulator({ categories }: { categories: Category[] }) {
+interface WhatIfSimulatorProps {
+  categories: Category[];
+  dateRange: DateRange;
+  periodLabel: string;
+}
+
+export function WhatIfSimulator({ categories, dateRange, periodLabel }: WhatIfSimulatorProps) {
   const [categoryId, setCategoryId] = useState(""); // "" = total spending
   const [percent, setPercent] = useState(0);
   const [result, setResult] = useState<SimulateResult | null>(null);
 
   useEffect(() => {
     const handle = setTimeout(() => {
-      api.simulate(percent, categoryId || undefined)
+      api.simulate(percent, categoryId || undefined, dateRange)
         .then(setResult)
         .catch(() => {});
     }, 150);
     return () => clearTimeout(handle);
-  }, [percent, categoryId]);
+  }, [percent, categoryId, dateRange]);
 
   const delta = result ? result.projected_balance - result.current_balance : 0;
   const categoryLabel = categoryId
@@ -70,7 +76,7 @@ export function WhatIfSimulator({ categories }: { categories: Category[] }) {
 
       {result && (
         <p className="text-xs text-muted-foreground mb-3">
-          Based on {fmt(result.actual_month_spend)} spent on {categoryLabel} so far this month — the
+          Based on {fmt(result.actual_spend)} spent on {categoryLabel} for {periodLabel} — the
           percentage applies to that amount, not your total balance.
         </p>
       )}
