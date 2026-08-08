@@ -90,3 +90,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Auth hero panel: floating preview cards + ambient glow */
+@keyframes auth-float-a {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-14px) rotate(-2deg); }
+}
+@keyframes auth-float-b {
+  0%, 100% { transform: translateY(0) rotate(4deg); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+}
+@keyframes auth-glow-pulse {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.32; }
+}
