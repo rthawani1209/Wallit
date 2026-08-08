@@ -4,10 +4,11 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.account import Account
+from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse
-from app.services import encryption, plaid as plaid_service
+from app.services import categorization, encryption, plaid as plaid_service
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
 
@@ -57,6 +58,7 @@ def exchange_token(
     # Pull transactions and store them
     db_accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
     account_map = {a.plaid_account_id: a.id for a in db_accounts}
+    category_map = {c.name: c.id for c in db.query(Category).all()}
 
     transactions, _ = plaid_service.sync_transactions(access_token)
     for t in transactions:
@@ -68,7 +70,9 @@ def exchange_token(
             Transaction.plaid_transaction_id == t["plaid_transaction_id"]
         ).first()
         if not existing:
-            db.add(Transaction(account_id=account_id, **t))
+            category_name = categorization.categorize(t.get("merchant_name"))
+            category_id = category_map.get(category_name) if category_name else None
+            db.add(Transaction(account_id=account_id, category_id=category_id, **t))
     db.commit()
 
     return {"message": "Bank connected and transactions synced"}
