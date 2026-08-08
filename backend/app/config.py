@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Encryption key for Plaid access tokens
     encryption_key: str = ""
 
+    # Anthropic (Claude API) — categorization fallback, later the AI chat / NL query feature
+    anthropic_api_key: str = ""
+
     class Config:
         env_file = ".env"
 

@@ -18,6 +18,9 @@ python-multipart==0.0.20
 # Plaid bank integration
 plaid-python==20.0.1
 
+# Anthropic (Claude API)
+anthropic==0.40.0
+
 # Redis client
 redis==5.2.1
 

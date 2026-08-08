@@ -24,7 +24,7 @@ def save_transactions(
         if not account_id:
             continue
 
-        category_name = categorization.resolve_category(t.get("merchant_name"), pfc)
+        category_name = categorization.resolve_category(t.get("merchant_name"), pfc, t.get("amount"))
         category_id = category_map.get(category_name) or category_map.get(categorization.FALLBACK_CATEGORY)
         plaid_primary = (pfc or {}).get("primary")
         plaid_detailed = (pfc or {}).get("detailed")

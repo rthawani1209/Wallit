@@ -6,13 +6,26 @@ what-if simulator to reflect real totals. Resolution order:
   1. Plaid's own `personal_finance_category` (real bank data, high coverage,
      ML-based — far more reliable than string-matching a merchant name)
   2. Keyword matching on merchant name (fallback for sparse/missing Plaid data)
-  3. "Fees/Other" (guaranteed catch-all — a transaction is never left uncategorized)
+  3. Claude API (for whatever's left — an unfamiliar merchant name Plaid also
+     couldn't confidently classify)
+  4. "Fees/Other" (guaranteed catch-all — a transaction is never left uncategorized,
+     reached only if Claude also can't make a confident call, or the API errors)
 
 This is a precursor to Phase 3's automated nightly job (which will also handle
 subscription and anomaly detection) — this module only covers categorization.
 """
+import logging
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 FALLBACK_CATEGORY = "Fees/Other"
+
+CATEGORY_NAMES = [
+    "Income", "Housing", "Utilities", "Food", "Transportation", "Subscriptions",
+    "Health", "Debt", "Shopping", "Entertainment", "Savings", "Giving", "Fees/Other",
+]
 
 # Plaid's `personal_finance_category.primary` -> our category taxonomy.
 # See https://plaid.com/docs/api/products/transactions/#personal-finance-category
@@ -104,13 +117,66 @@ def categorize_from_keywords(merchant_name: str | None) -> str | None:
     return None
 
 
-def resolve_category(merchant_name: str | None, personal_finance_category: dict | None) -> str:
+def categorize_with_claude(
+    merchant_name: str | None,
+    amount: float | None,
+    personal_finance_category: dict | None,
+) -> str | None:
+    """
+    Last resort before the catch-all: ask Claude to pick a category for a merchant
+    that both Plaid and keyword matching failed to confidently classify. Returns
+    None (never raises) on any failure — missing API key, network error, or a
+    response that isn't exactly one of our category names — so the caller always
+    has a safe fallback.
+    """
+    if not settings.anthropic_api_key or not merchant_name:
+        return None
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        hints = ""
+        if personal_finance_category:
+            hints = (
+                f" Plaid's own (unmapped) category hint: "
+                f"{personal_finance_category.get('primary')} / {personal_finance_category.get('detailed')}."
+            )
+        message = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=20,
+            system=(
+                "You categorize a personal-finance transaction into exactly one of these "
+                f"categories: {', '.join(CATEGORY_NAMES)}. "
+                "Reply with only the category name, exactly as written, nothing else."
+            ),
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Merchant: {merchant_name!r}. Amount: ${amount}.{hints}",
+                }
+            ],
+        )
+        answer = message.content[0].text.strip()
+        return answer if answer in CATEGORY_NAMES else None
+    except Exception:
+        logger.exception("Claude categorization call failed for merchant %r", merchant_name)
+        return None
+
+
+def resolve_category(
+    merchant_name: str | None,
+    personal_finance_category: dict | None,
+    amount: float | None = None,
+) -> str:
     """
     Always returns a category name — Plaid data first, keyword fallback second,
-    guaranteed "Fees/Other" catch-all last. A transaction is never left uncategorized.
+    Claude API third for whatever's still unmatched, guaranteed "Fees/Other"
+    catch-all last. A transaction is never left uncategorized.
     """
     return (
         categorize_from_plaid(personal_finance_category)
         or categorize_from_keywords(merchant_name)
+        or categorize_with_claude(merchant_name, amount, personal_finance_category)
         or FALLBACK_CATEGORY
     )
