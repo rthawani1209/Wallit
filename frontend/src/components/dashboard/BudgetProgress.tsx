@@ -22,11 +22,25 @@ export function BudgetProgress({
   const [managing, setManaging] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function updateDraft(categoryId: string, value: string) {
+    setDrafts((prev) => ({ ...prev, [categoryId]: value }));
+    setErrors((prev) => {
+      if (!(categoryId in prev)) return prev;
+      const next = { ...prev };
+      delete next[categoryId];
+      return next;
+    });
+  }
 
   async function handleSave(categoryId: string) {
     const raw = drafts[categoryId];
     const value = Number(raw);
-    if (!raw || !Number.isFinite(value) || value <= 0) return;
+    if (!raw || !Number.isFinite(value) || value <= 0) {
+      setErrors((prev) => ({ ...prev, [categoryId]: "Enter an amount greater than $0" }));
+      return;
+    }
     setSaving(categoryId);
     try {
       await onSetLimit(categoryId, value);
@@ -35,6 +49,8 @@ export function BudgetProgress({
         delete next[categoryId];
         return next;
       });
+    } catch {
+      setErrors((prev) => ({ ...prev, [categoryId]: "Couldn't save — try again" }));
     } finally {
       setSaving(null);
     }
@@ -71,25 +87,30 @@ export function BudgetProgress({
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-medium text-sm">{b.category_name}</span>
                   {managing ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs font-mono">$</span>
-                      <input
-                        type="number"
-                        min={1}
-                        placeholder={String(b.limit)}
-                        value={drafts[b.category_id] ?? ""}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({ ...prev, [b.category_id]: e.target.value }))
-                        }
-                        className="w-20 bg-transparent border border-border rounded-md px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
-                      />
-                      <button
-                        onClick={() => handleSave(b.category_id)}
-                        disabled={saving === b.category_id || !drafts[b.category_id]}
-                        className="text-primary text-xs font-medium disabled:opacity-40 disabled:pointer-events-none hover:underline"
-                      >
-                        {saving === b.category_id ? "Saving…" : "Save"}
-                      </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs font-mono">$</span>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder={String(b.limit)}
+                          value={drafts[b.category_id] ?? ""}
+                          onChange={(e) => updateDraft(b.category_id, e.target.value)}
+                          className={`w-20 bg-transparent border rounded-md px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 ${
+                            errors[b.category_id] ? "border-destructive" : "border-border"
+                          }`}
+                        />
+                        <button
+                          onClick={() => handleSave(b.category_id)}
+                          disabled={saving === b.category_id}
+                          className="text-primary text-xs font-medium disabled:opacity-40 disabled:pointer-events-none hover:underline"
+                        >
+                          {saving === b.category_id ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                      {errors[b.category_id] && (
+                        <span className="text-destructive text-[11px]">{errors[b.category_id]}</span>
+                      )}
                     </div>
                   ) : (
                     <span className="text-sm font-mono">
