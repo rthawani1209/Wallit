@@ -17,7 +17,9 @@ router = APIRouter(tags=["simulate"])
 
 @router.get("/simulate", response_model=SimulateResponse)
 def simulate(
-    percent_change: float = Query(..., description="e.g. -20 to cut spend by 20%, 15 to increase by 15%"),
+    percent_change: float = Query(
+        ..., ge=-100, description="e.g. -20 to cut spend by 20%, 15 to increase by 15%. Can't go below -100 (can't spend less than $0)."
+    ),
     category_id: uuid.UUID | None = Query(None, description="Limit the change to one category; omit for total spend"),
     start_date: date | None = Query(None, description="Defaults to the 1st of the current month"),
     end_date: date | None = Query(None, description="Defaults to today"),

@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -127,7 +128,7 @@ def get_budget_progress(current_user: User = Depends(get_current_user), db: Sess
 
 @router.put("/{category_id}", response_model=BudgetProgress)
 def set_budget(
-    category_id: str,
+    category_id: uuid.UUID,
     body: BudgetSetRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

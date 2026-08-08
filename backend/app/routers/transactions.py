@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -41,7 +42,7 @@ def get_transactions(current_user: User = Depends(get_current_user), db: Session
 
 @router.patch("/{transaction_id}", response_model=TransactionResponse)
 def update_transaction(
-    transaction_id: str,
+    transaction_id: uuid.UUID,
     body: TransactionUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

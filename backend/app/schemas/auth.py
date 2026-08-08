@@ -1,12 +1,12 @@
 import uuid
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
     first_name: str
     last_name: str
     date_of_birth: date
