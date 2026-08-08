@@ -31,7 +31,18 @@ ANOMALY_STDDEV_MULTIPLIER = 2
 ANOMALY_MIN_DOLLAR_GAP = 20
 PRICE_HIKE_THRESHOLD = 1.05  # 5% increase
 
-NON_SUBSCRIPTION_CATEGORIES = {"Debt", "Savings", "Housing", "Income"}
+# Recurring transfers and paychecks aren't a "charge" of any kind — everything else
+# (including Debt/Housing, which read as bills rather than subscriptions) is still
+# eligible for detection; NON_DISCRETIONARY_CATEGORIES below is what the Subscriptions
+# page filters out for display, separate from detection itself.
+NON_RECURRING_CHARGE_CATEGORIES = {"Savings", "Income"}
+NON_DISCRETIONARY_CATEGORIES = {"Debt", "Housing", "Savings", "Income"}
+
+
+# Inverse of _classify_interval — used to project a subscription's future occurrence
+# dates for the calendar view. Approximate day-counts, not calendar-exact; fine for a
+# visual calendar, not meant to be a ledger.
+INTERVAL_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 91, "annual": 365}
 
 
 def _classify_interval(avg_days: float) -> str | None:
@@ -44,6 +55,32 @@ def _classify_interval(avg_days: float) -> str | None:
     if 350 <= avg_days <= 380:
         return "annual"
     return None
+
+
+def project_occurrences(sub: Subscription, range_start: date, range_end: date) -> list[date]:
+    """
+    Given a subscription's most recently known due date and billing interval, project
+    every occurrence date that falls within [range_start, range_end] — including past
+    or future months, not just the one next_estimated_date happens to point at. Used
+    by the calendar view, which needs to show occurrences for whatever month the user
+    navigates to, not just the single next charge.
+    """
+    step = INTERVAL_DAYS.get(sub.billing_interval)
+    if not step or not sub.next_estimated_date:
+        return []
+
+    d = sub.next_estimated_date
+    # Walk to the first occurrence at or after range_start, in whichever direction is needed.
+    while d > range_start:
+        d -= timedelta(days=step)
+    while d < range_start:
+        d += timedelta(days=step)
+
+    occurrences = []
+    while d <= range_end:
+        occurrences.append(d)
+        d += timedelta(days=step)
+    return occurrences
 
 
 def suggest_cheaper_alternative(merchant_name: str, amount: float, billing_interval: str) -> str | None:
@@ -98,10 +135,10 @@ def detect_subscriptions(db: Session, user_id) -> None:
             Transaction.date >= lookback_start,
             Transaction.amount > 0,
             Transaction.merchant_name.isnot(None),
-            # Recurring debt payments, savings transfers, rent, and income aren't
-            # "subscriptions" a user would think to cancel or downgrade — they're
-            # already visible elsewhere (Upcoming Bills, the Savings category).
-            Category.name.notin_(NON_SUBSCRIPTION_CATEGORIES),
+            # Savings transfers and paychecks aren't a "charge" at all — everything
+            # else (including bills like rent/loan payments) is fair game; the
+            # Subscriptions page filters further for its own "cancellable" framing.
+            Category.name.notin_(NON_RECURRING_CHARGE_CATEGORIES),
         )
         .order_by(Transaction.date)
         .all()
@@ -157,12 +194,14 @@ def detect_subscriptions(db: Session, user_id) -> None:
             t.is_subscription = True
 
         latest_amount = amounts[-1]
+        latest_category_id = occurrences[-1].category_id
         sub = existing_subs.get(merchant)
         if sub:
             old_amount = float(sub.amount)
             sub.amount = latest_amount
             sub.billing_interval = interval_label
             sub.next_estimated_date = next_due
+            sub.category_id = latest_category_id
             sub.is_active = True
             if old_amount > 0 and latest_amount > old_amount * PRICE_HIKE_THRESHOLD:
                 latest_txn = occurrences[-1]
@@ -181,6 +220,7 @@ def detect_subscriptions(db: Session, user_id) -> None:
                     amount=latest_amount,
                     billing_interval=interval_label,
                     next_estimated_date=next_due,
+                    category_id=latest_category_id,
                     is_active=True,
                     cheaper_alternative=suggest_cheaper_alternative(merchant, latest_amount, interval_label),
                 )
