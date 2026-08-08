@@ -66,6 +66,19 @@ def get_budget_progress(current_user: User = Depends(get_current_user), db: Sess
     )
 
     # Average monthly spend over the prior 3 full months — basis for auto-suggested limits.
+    # Divide by how many of those months actually have any transaction history, not a
+    # fixed 3 — otherwise a newer account's averages come out deflated (and immediately
+    # look "over budget") until a full 3 months of data exists.
+    months_with_data = (
+        db.query(func.count(func.distinct(func.to_char(Transaction.date, "YYYY-MM"))))
+        .filter(
+            Transaction.account_id.in_(account_ids),
+            Transaction.date >= history_start,
+            Transaction.date < month_start,
+        )
+        .scalar()
+    ) or 1
+
     history_rows = (
         db.query(Transaction.category_id, func.sum(Transaction.amount))
         .filter(
@@ -77,7 +90,9 @@ def get_budget_progress(current_user: User = Depends(get_current_user), db: Sess
         .group_by(Transaction.category_id)
         .all()
     )
-    avg_spend = {cat_id: float(total) / 3 for cat_id, total in history_rows if cat_id is not None}
+    avg_spend = {
+        cat_id: float(total) / months_with_data for cat_id, total in history_rows if cat_id is not None
+    }
 
     overrides = {
         b.category_id: b.monthly_limit

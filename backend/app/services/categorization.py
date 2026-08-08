@@ -47,6 +47,16 @@ UTILITIES_DETAILED = {
     "RENT_AND_UTILITIES_OTHER_UTILITIES",
 }
 
+# TRANSFER_OUT/TRANSFER_IN are generic "money moved between accounts" primaries —
+# when the detailed subcategory identifies it as going to/from savings or investment,
+# that's a much better fit for our "Savings" category than the Fees/Other catch-all.
+SAVINGS_DETAILED = {
+    "TRANSFER_OUT_SAVINGS",
+    "TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS",
+    "TRANSFER_IN_SAVINGS",
+    "TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS",
+}
+
 # Keyword fallback for when Plaid's category is missing (rare) or unmapped.
 # Ordered so more specific keywords are checked before generic ones.
 CATEGORY_KEYWORDS: list[tuple[str, list[str]]] = [
@@ -73,8 +83,10 @@ def categorize_from_plaid(personal_finance_category: dict | None) -> str | None:
     if not personal_finance_category:
         return None
     primary = personal_finance_category.get("primary")
+    detailed = personal_finance_category.get("detailed")
+    if detailed in SAVINGS_DETAILED:
+        return "Savings"
     if primary == "RENT_AND_UTILITIES":
-        detailed = personal_finance_category.get("detailed")
         return "Utilities" if detailed in UTILITIES_DETAILED else "Housing"
     return PLAID_PRIMARY_MAP.get(primary)
 

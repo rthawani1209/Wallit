@@ -7,12 +7,27 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.account import Account
 from app.models.category import Category
-from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse
-from app.services import categorization, encryption, plaid as plaid_service
+from app.services import encryption, plaid as plaid_service
+from app.services.transaction_sync import save_transactions
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
+
+
+def _fetch_all_transactions(access_token: str) -> list[dict]:
+    """
+    Full transaction history for an access token. Right after linking (or when
+    forcing a resync), Plaid may still be generating/enriching the item's history —
+    an empty poll doesn't mean it's done, just that nothing new landed yet — so this
+    polls a fixed number of extra times rather than stopping at the first empty result.
+    """
+    transactions, cursor = plaid_service.sync_transactions(access_token)
+    for _ in range(5):
+        time.sleep(2)
+        more, cursor = plaid_service.sync_transactions(access_token, cursor)
+        transactions.extend(more)
+    return transactions
 
 
 @router.post("/link-token", response_model=LinkTokenResponse)
@@ -62,30 +77,30 @@ def exchange_token(
     account_map = {a.plaid_account_id: a.id for a in db_accounts}
     category_map = {c.name: c.id for c in db.query(Category).all()}
 
-    transactions, cursor = plaid_service.sync_transactions(access_token)
-    # Right after linking, Plaid may still be generating/enriching the item's
-    # transaction history — the first sync call can return a partial batch with
-    # personal_finance_category missing on recent entries. An empty poll doesn't
-    # mean backfill is done (just that nothing new landed yet), so keep polling
-    # for a fixed budget rather than stopping at the first empty result.
-    for _ in range(5):
-        time.sleep(2)
-        more, cursor = plaid_service.sync_transactions(access_token, cursor)
-        transactions.extend(more)
-
-    for t in transactions:
-        plaid_acct_id = t.pop("plaid_account_id")
-        pfc = t.pop("personal_finance_category")
-        account_id = account_map.get(plaid_acct_id)
-        if not account_id:
-            continue
-        existing = db.query(Transaction).filter(
-            Transaction.plaid_transaction_id == t["plaid_transaction_id"]
-        ).first()
-        if not existing:
-            category_name = categorization.resolve_category(t.get("merchant_name"), pfc)
-            category_id = category_map.get(category_name) or category_map.get(categorization.FALLBACK_CATEGORY)
-            db.add(Transaction(account_id=account_id, category_id=category_id, **t))
+    transactions = _fetch_all_transactions(access_token)
+    save_transactions(db, account_map, category_map, transactions)
     db.commit()
 
     return {"message": "Bank connected and transactions synced"}
+
+
+@router.post("/resync")
+def resync(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Re-fetch full transaction history from Plaid and refresh categorization on every
+    row (not just new ones). Useful if an earlier sync caught a partial batch, or after
+    an improvement to the categorization logic.
+    """
+    if not current_user.plaid_access_token:
+        raise HTTPException(status_code=400, detail="No bank account connected")
+    access_token = encryption.decrypt(current_user.plaid_access_token)
+
+    db_accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
+    account_map = {a.plaid_account_id: a.id for a in db_accounts}
+    category_map = {c.name: c.id for c in db.query(Category).all()}
+
+    transactions = _fetch_all_transactions(access_token)
+    touched = save_transactions(db, account_map, category_map, transactions)
+    db.commit()
+
+    return {"message": "Resynced", "transactions_touched": touched}

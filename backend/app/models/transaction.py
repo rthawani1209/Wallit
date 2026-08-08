@@ -16,6 +16,10 @@ class Transaction(Base):
     merchant_name = Column(String, nullable=True)
     date = Column(Date, nullable=False, index=True)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True, index=True)
+    # Plaid's own raw categorization, kept alongside our derived category_id so a
+    # transaction can be recategorized later without re-fetching from Plaid.
+    plaid_category_primary = Column(String, nullable=True)
+    plaid_category_detailed = Column(String, nullable=True)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=True, index=True)
     is_subscription = Column(Boolean, default=False, nullable=False)
     is_anomaly = Column(Boolean, default=False, nullable=False)
