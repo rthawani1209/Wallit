@@ -57,7 +57,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {error && <p className="text-danger text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
           <Button
             type="submit"
             loading={loading}
@@ -68,9 +68,9 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-sm text-center text-muted">
+        <p className="mt-4 text-sm text-center text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-accent hover:underline">
+          <Link href="/signup" className="text-primary hover:underline">
             Sign up
           </Link>
         </p>
