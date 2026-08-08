@@ -6,7 +6,7 @@ from app.dependencies import get_current_user
 from app.models.account import Account
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.schemas.plaid import AccountResponse, ExchangeTokenRequest, LinkTokenResponse, TransactionResponse
+from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse
 from app.services import encryption, plaid as plaid_service
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
@@ -72,21 +72,3 @@ def exchange_token(
     db.commit()
 
     return {"message": "Bank connected and transactions synced"}
-
-
-@router.get("/accounts", response_model=list[AccountResponse])
-def get_accounts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(Account).filter(Account.user_id == current_user.id).all()
-
-
-@router.get("/transactions", response_model=list[TransactionResponse])
-def get_transactions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
-    account_ids = [a.id for a in accounts]
-    return (
-        db.query(Transaction)
-        .filter(Transaction.account_id.in_(account_ids))
-        .order_by(Transaction.date.desc())
-        .limit(100)
-        .all()
-    )
