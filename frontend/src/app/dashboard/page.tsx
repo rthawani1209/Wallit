@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([api.plaid.getAccounts(), api.plaid.getTransactions()])
+    Promise.all([api.accounts.getAll(), api.transactions.getAll()])
       .then(([accts, txns]) => {
         setAccounts(accts);
         setTransactions(txns);

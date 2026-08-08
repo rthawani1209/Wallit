@@ -46,15 +46,37 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ public_token }),
       }),
+  },
 
-    getAccounts: () => request<Account[]>("/api/v1/plaid/accounts"),
-    getTransactions: () => request<Transaction[]>("/api/v1/plaid/transactions"),
+  accounts: {
+    getAll: () => request<Account[]>("/api/v1/accounts"),
+  },
+
+  transactions: {
+    getAll: () => request<Transaction[]>("/api/v1/transactions"),
+
+    updateCategory: (id: string, category_id: string) =>
+      request<Transaction>(`/api/v1/transactions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ category_id }),
+      }),
+
+    getSummary: () => request<CategorySpend[]>("/api/v1/transactions/summary"),
+  },
+
+  categories: {
+    getAll: () => request<Category[]>("/api/v1/categories"),
+  },
+
+  simulate: (percentChange: number, categoryId?: string) => {
+    const params = new URLSearchParams({ percent_change: String(percentChange) });
+    if (categoryId) params.set("category_id", categoryId);
+    return request<SimulateResult>(`/api/v1/simulate?${params.toString()}`);
   },
 };
 
 export interface Account {
   id: string;
-  plaid_account_id: string;
   name: string;
   type: string;
   current_balance: number | null;
@@ -65,6 +87,25 @@ export interface Transaction {
   amount: number;
   merchant_name: string | null;
   date: string;
+  category_id: string | null;
   is_subscription: boolean;
   is_anomaly: boolean;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface CategorySpend {
+  category_id: string | null;
+  category_name: string;
+  total: number;
+}
+
+export interface SimulateResult {
+  current_balance: number;
+  actual_month_spend: number;
+  projected_month_spend: number;
+  projected_balance: number;
 }
