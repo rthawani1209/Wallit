@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
 import { api, Account, Category, CategorySpend, Transaction } from "@/lib/api";
+import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { SpendChart } from "@/components/dashboard/SpendChart";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
+import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 
 const today = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -27,6 +29,17 @@ export default function DashboardPage() {
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [period, setPeriod] = useState<Period>("this_month");
+  const [customMonth, setCustomMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  const dateRange = useMemo(
+    () => getDateRange(period, customMonth),
+    [period, customMonth]
+  );
+  const currentPeriodLabel = useMemo(
+    () => formatPeriodLabel(period, customMonth),
+    [period, customMonth]
+  );
 
   useEffect(() => {
     api.auth.me()
@@ -40,18 +53,21 @@ export default function DashboardPage() {
       api.accounts.getAll(),
       api.transactions.getAll(),
       api.categories.getAll(),
-      api.transactions.getSummary(),
     ])
-      .then(([accts, txns, cats, summary]) => {
+      .then(([accts, txns, cats]) => {
         setAccounts(accts);
         setTransactions(txns);
         setCategories(cats);
-        setSpendSummary(summary);
         setPlaidLinked(accts.length > 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !plaidLinked) return;
+    api.transactions.getSummary(dateRange).then(setSpendSummary).catch(() => {});
+  }, [user, plaidLinked, dateRange]);
 
   function handleCategoryChange(transactionId: string, categoryId: string) {
     setTransactions((prev) =>
@@ -59,7 +75,7 @@ export default function DashboardPage() {
     );
     // Recategorizing shifts the spend breakdown, so refresh the chart from the server
     // rather than duplicating the aggregation logic on the client.
-    api.transactions.getSummary().then(setSpendSummary).catch(() => {});
+    api.transactions.getSummary(dateRange).then(setSpendSummary).catch(() => {});
   }
 
   async function handleLogout() {
@@ -144,19 +160,35 @@ export default function DashboardPage() {
               <PlaidConnectButton onSuccess={() => window.location.reload()} />
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="md:col-span-2">
-                <TransactionList
-                  transactions={transactions}
-                  categories={categories}
-                  onCategoryChange={handleCategoryChange}
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Showing</span>
+                <PeriodSelector
+                  period={period}
+                  customMonth={customMonth}
+                  onPeriodChange={setPeriod}
+                  onCustomMonthChange={setCustomMonth}
                 />
               </div>
-              <SpendChart data={spendSummary} />
-              <div className="md:col-span-3">
-                <WhatIfSimulator categories={categories} />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="md:col-span-2">
+                  <TransactionList
+                    transactions={transactions}
+                    categories={categories}
+                    onCategoryChange={handleCategoryChange}
+                  />
+                </div>
+                <SpendChart data={spendSummary} periodLabel={currentPeriodLabel} />
+                <div className="md:col-span-3">
+                  <WhatIfSimulator
+                    categories={categories}
+                    dateRange={dateRange}
+                    periodLabel={currentPeriodLabel}
+                  />
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </main>
