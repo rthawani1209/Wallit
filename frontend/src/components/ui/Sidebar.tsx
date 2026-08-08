@@ -7,6 +7,8 @@ interface SidebarProps {
   userEmail: string;
   accounts: Account[];
   onLogout: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 const navItems = [{ icon: LayoutDashboard, label: "Dashboard" }];
@@ -23,9 +25,21 @@ function initials(email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ userEmail, accounts, onLogout }: SidebarProps) {
+export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: SidebarProps) {
   return (
-    <aside className="w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border">
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border transition-transform duration-200 md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       <div className="px-5 py-5 border-b border-border">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center">
@@ -96,6 +110,7 @@ export function Sidebar({ userEmail, accounts, onLogout }: SidebarProps) {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
