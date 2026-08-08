@@ -61,16 +61,28 @@ export const api = {
         body: JSON.stringify({ category_id }),
       }),
 
-    getSummary: () => request<CategorySpend[]>("/api/v1/transactions/summary"),
+    getSummary: (range?: DateRange) => {
+      const params = new URLSearchParams();
+      if (range) {
+        params.set("start_date", range.startDate);
+        params.set("end_date", range.endDate);
+      }
+      const qs = params.toString();
+      return request<CategorySpend[]>(`/api/v1/transactions/summary${qs ? `?${qs}` : ""}`);
+    },
   },
 
   categories: {
     getAll: () => request<Category[]>("/api/v1/categories"),
   },
 
-  simulate: (percentChange: number, categoryId?: string) => {
+  simulate: (percentChange: number, categoryId?: string, range?: DateRange) => {
     const params = new URLSearchParams({ percent_change: String(percentChange) });
     if (categoryId) params.set("category_id", categoryId);
+    if (range) {
+      params.set("start_date", range.startDate);
+      params.set("end_date", range.endDate);
+    }
     return request<SimulateResult>(`/api/v1/simulate?${params.toString()}`);
   },
 };
@@ -105,7 +117,12 @@ export interface CategorySpend {
 
 export interface SimulateResult {
   current_balance: number;
-  actual_month_spend: number;
-  projected_month_spend: number;
+  actual_spend: number;
+  projected_spend: number;
   projected_balance: number;
+}
+
+export interface DateRange {
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
 }
