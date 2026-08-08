@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
-import { api, Account, Transaction } from "@/lib/api";
+import { Wallet } from "lucide-react";
+import { api, Account, Category, Transaction } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { TransactionList } from "@/components/dashboard/TransactionList";
 
 const today = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -30,15 +32,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([api.accounts.getAll(), api.transactions.getAll()])
-      .then(([accts, txns]) => {
+    Promise.all([api.accounts.getAll(), api.transactions.getAll(), api.categories.getAll()])
+      .then(([accts, txns, cats]) => {
         setAccounts(accts);
         setTransactions(txns);
+        setCategories(cats);
         setPlaidLinked(accts.length > 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
+
+  function handleCategoryChange(transactionId: string, categoryId: string) {
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === transactionId ? { ...t, category_id: categoryId } : t))
+    );
+  }
 
   async function handleLogout() {
     await api.auth.logout();
@@ -107,53 +116,11 @@ export default function DashboardPage() {
               <PlaidConnectButton onSuccess={() => window.location.reload()} />
             </Card>
           ) : (
-            <Card className="p-6">
-              <h2 className="font-semibold text-[15px] tracking-tight mb-4">Recent transactions</h2>
-              {transactions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No transactions yet.</p>
-              ) : (
-                <div className="space-y-0.5">
-                  {transactions.slice(0, 20).map((t) => {
-                    const isIncome = t.amount < 0;
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex items-center gap-3 px-2 py-2.5 rounded-md hover:bg-secondary/50 transition-colors"
-                      >
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            isIncome ? "bg-primary/10" : "bg-secondary"
-                          }`}
-                        >
-                          {isIncome ? (
-                            <ArrowDownLeft className="w-3.5 h-3.5 text-primary" />
-                          ) : (
-                            <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {t.merchant_name ?? "Unknown"}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">{t.date}</p>
-                        </div>
-                        <p
-                          className={`text-sm font-semibold font-mono flex-shrink-0 ${
-                            isIncome ? "text-primary" : "text-foreground"
-                          }`}
-                        >
-                          {isIncome ? "+" : "-"}
-                          {Math.abs(t.amount).toLocaleString("en-US", {
-                            style: "currency",
-                            currency: "USD",
-                          })}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
+            <TransactionList
+              transactions={transactions}
+              categories={categories}
+              onCategoryChange={handleCategoryChange}
+            />
           )}
         </div>
       </main>
