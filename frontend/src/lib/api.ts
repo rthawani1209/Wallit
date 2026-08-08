@@ -86,6 +86,12 @@ export const api = {
       request<CashFlowMonth[]>(`/api/v1/transactions/cashflow?months=${months}`),
 
     getUpcomingBills: () => request<UpcomingBill[]>("/api/v1/transactions/upcoming-bills"),
+
+    getAnomalies: () => request<Anomaly[]>("/api/v1/transactions/anomalies"),
+  },
+
+  subscriptions: {
+    getAll: () => request<Subscription[]>("/api/v1/subscriptions"),
   },
 
   budgets: {
@@ -179,4 +185,23 @@ export interface UpcomingBill {
   merchant_name: string;
   amount: number;
   next_due_date: string; // YYYY-MM-DD
+}
+
+export interface Subscription {
+  id: string;
+  merchant_name: string;
+  amount: number;
+  billing_interval: string; // "weekly" | "monthly" | "quarterly" | "annual"
+  next_estimated_date: string | null;
+  cheaper_alternative: string | null;
+  is_active: boolean;
+}
+
+export interface Anomaly {
+  id: string;
+  merchant_name: string | null;
+  amount: number;
+  date: string;
+  category_name: string | null;
+  anomaly_reason: string | null;
 }

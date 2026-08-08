@@ -1,6 +1,8 @@
 "use client";
 
-import { LayoutDashboard, LogOut, RefreshCw, Wallet } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, LogOut, RefreshCw, Repeat, Wallet } from "lucide-react";
 import type { Account } from "@/lib/api";
 
 interface SidebarProps {
@@ -14,7 +16,10 @@ interface SidebarProps {
   lastSyncedLabel: string | null;
 }
 
-const navItems = [{ icon: LayoutDashboard, label: "Dashboard" }];
+const navItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: Repeat, label: "Subscriptions", href: "/subscriptions" },
+];
 
 const GRID_BACKGROUND = {
   backgroundImage:
@@ -44,6 +49,8 @@ export function Sidebar({
   syncing,
   lastSyncedLabel,
 }: SidebarProps) {
+  const pathname = usePathname();
+
   return (
     <>
       {isOpen && (
@@ -83,16 +90,27 @@ export function Sidebar({
           Workspace
         </p>
         <div className="space-y-0.5">
-          {navItems.map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium bg-primary/10 text-primary shadow-[0_0_16px_-4px_rgba(16,217,140,0.4)]"
-            >
-              <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary shadow-[0_0_8px_rgba(16,217,140,0.8)]" />
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-            </div>
-          ))}
+          {navItems.map(({ icon: Icon, label, href }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={label}
+                href={href}
+                onClick={onClose}
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-primary/10 text-primary shadow-[0_0_16px_-4px_rgba(16,217,140,0.4)]"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-white/[0.03]"
+                }`}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary shadow-[0_0_8px_rgba(16,217,140,0.8)]" />
+                )}
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
         </div>
 
         <p className="px-3 pt-5 pb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">

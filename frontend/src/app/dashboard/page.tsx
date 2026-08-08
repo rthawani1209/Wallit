@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
-import { api, Account, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Transaction, UpcomingBill } from "@/lib/api";
+import { api, Account, Anomaly, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Transaction, UpcomingBill } from "@/lib/api";
 import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +13,7 @@ import { SpendChart } from "@/components/dashboard/SpendChart";
 import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { BudgetProgress } from "@/components/dashboard/BudgetProgress";
 import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
+import { AnomaliesCard } from "@/components/dashboard/AnomaliesCard";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [cashFlow, setCashFlow] = useState<CashFlowMonth[]>([]);
   const [budgetProgress, setBudgetProgress] = useState<BudgetProgressData[]>([]);
   const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>([]);
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -92,6 +94,11 @@ export default function DashboardPage() {
     api.transactions.getUpcomingBills().then(setUpcomingBills).catch(() => {});
   }, [user, plaidLinked]);
 
+  useEffect(() => {
+    if (!user || !plaidLinked) return;
+    api.transactions.getAnomalies().then(setAnomalies).catch(() => {});
+  }, [user, plaidLinked]);
+
   async function handleSetBudget(categoryId: string, limit: number) {
     const updated = await api.budgets.set(categoryId, limit);
     setBudgetProgress((prev) => {
@@ -128,6 +135,7 @@ export default function DashboardPage() {
         api.transactions.getCashFlow().then(setCashFlow),
         api.budgets.getProgress().then(setBudgetProgress),
         api.transactions.getUpcomingBills().then(setUpcomingBills),
+        api.transactions.getAnomalies().then(setAnomalies),
       ]);
       setLastSyncedLabel("just now");
     } catch (err) {
@@ -258,6 +266,8 @@ export default function DashboardPage() {
                   onCustomMonthChange={setCustomMonth}
                 />
               </div>
+
+              <AnomaliesCard data={anomalies} />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="md:col-span-2">
