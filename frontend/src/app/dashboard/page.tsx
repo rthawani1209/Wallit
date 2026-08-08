@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
-import { api, Account, Category, Transaction } from "@/lib/api";
+import { api, Account, Category, CategorySpend, Transaction } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TransactionList } from "@/components/dashboard/TransactionList";
+import { SpendChart } from "@/components/dashboard/SpendChart";
 
 const today = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [spendSummary, setSpendSummary] = useState<CategorySpend[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -32,11 +34,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([api.accounts.getAll(), api.transactions.getAll(), api.categories.getAll()])
-      .then(([accts, txns, cats]) => {
+    Promise.all([
+      api.accounts.getAll(),
+      api.transactions.getAll(),
+      api.categories.getAll(),
+      api.transactions.getSummary(),
+    ])
+      .then(([accts, txns, cats, summary]) => {
         setAccounts(accts);
         setTransactions(txns);
         setCategories(cats);
+        setSpendSummary(summary);
         setPlaidLinked(accts.length > 0);
       })
       .catch(() => {})
@@ -47,6 +55,9 @@ export default function DashboardPage() {
     setTransactions((prev) =>
       prev.map((t) => (t.id === transactionId ? { ...t, category_id: categoryId } : t))
     );
+    // Recategorizing shifts the spend breakdown, so refresh the chart from the server
+    // rather than duplicating the aggregation logic on the client.
+    api.transactions.getSummary().then(setSpendSummary).catch(() => {});
   }
 
   async function handleLogout() {
@@ -116,11 +127,16 @@ export default function DashboardPage() {
               <PlaidConnectButton onSuccess={() => window.location.reload()} />
             </Card>
           ) : (
-            <TransactionList
-              transactions={transactions}
-              categories={categories}
-              onCategoryChange={handleCategoryChange}
-            />
+            <div className="grid grid-cols-3 gap-5">
+              <div className="col-span-2">
+                <TransactionList
+                  transactions={transactions}
+                  categories={categories}
+                  onCategoryChange={handleCategoryChange}
+                />
+              </div>
+              <SpendChart data={spendSummary} />
+            </div>
           )}
         </div>
       </main>
