@@ -71,7 +71,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div
-          className="absolute bottom-10 left-6 w-52 rounded-2xl p-5 shadow-2xl overflow-hidden hidden xl:block opacity-90"
+          className="absolute top-10 left-6 w-52 rounded-2xl p-5 shadow-2xl overflow-hidden hidden xl:block opacity-90"
           style={{
             background: "linear-gradient(135deg, #10d98c 0%, #059669 100%)",
             animation: "auth-float-a 9s ease-in-out infinite",
