@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -60,10 +60,16 @@ def update_transaction(
 
 
 @router.get("/summary", response_model=list[CategorySpend])
-def get_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Spend by category, month-to-date. Only counts expenses (positive amounts), not income."""
+def get_summary(
+    start_date: date | None = Query(None, description="Defaults to the 1st of the current month"),
+    end_date: date | None = Query(None, description="Defaults to today"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Spend by category for a date range (defaults to month-to-date). Only counts expenses, not income."""
     account_ids = _user_account_ids(db, current_user.id)
-    month_start = date.today().replace(day=1)
+    range_start = start_date or date.today().replace(day=1)
+    range_end = end_date or date.today()
 
     rows = (
         db.query(
@@ -74,7 +80,8 @@ def get_summary(current_user: User = Depends(get_current_user), db: Session = De
         .join(Transaction, Transaction.category_id == Category.id)
         .filter(
             Transaction.account_id.in_(account_ids),
-            Transaction.date >= month_start,
+            Transaction.date >= range_start,
+            Transaction.date <= range_end,
             Transaction.amount > 0,
         )
         .group_by(Category.id, Category.name)
@@ -85,7 +92,8 @@ def get_summary(current_user: User = Depends(get_current_user), db: Session = De
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
             Transaction.account_id.in_(account_ids),
-            Transaction.date >= month_start,
+            Transaction.date >= range_start,
+            Transaction.date <= range_end,
             Transaction.amount > 0,
             Transaction.category_id.is_(None),
         )

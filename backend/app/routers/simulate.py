@@ -19,40 +19,45 @@ router = APIRouter(tags=["simulate"])
 def simulate(
     percent_change: float = Query(..., description="e.g. -20 to cut spend by 20%, 15 to increase by 15%"),
     category_id: uuid.UUID | None = Query(None, description="Limit the change to one category; omit for total spend"),
+    start_date: date | None = Query(None, description="Defaults to the 1st of the current month"),
+    end_date: date | None = Query(None, description="Defaults to today"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     What-if budget simulator: apply a hypothetical percent change to either one category's
-    month-to-date spend or total month-to-date spend, and project the resulting balance.
+    spend or total spend over a date range (defaults to month-to-date), and project the
+    resulting balance.
     """
     accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
     account_ids = [a.id for a in accounts]
     current_balance = float(sum(a.current_balance or 0 for a in accounts))
 
-    month_start = date.today().replace(day=1)
+    range_start = start_date or date.today().replace(day=1)
+    range_end = end_date or date.today()
     base_filters = [
         Transaction.account_id.in_(account_ids),
-        Transaction.date >= month_start,
+        Transaction.date >= range_start,
+        Transaction.date <= range_end,
         Transaction.amount > 0,
     ]
     if category_id is not None:
         base_filters.append(Transaction.category_id == category_id)
 
-    actual_month_spend = float(
+    actual_spend = float(
         db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(*base_filters).scalar()
     )
 
     if category_id is not None:
-        delta = actual_month_spend * (percent_change / 100)
-        projected_month_spend = actual_month_spend + delta
+        delta = actual_spend * (percent_change / 100)
+        projected_spend = actual_spend + delta
     else:
-        projected_month_spend = actual_month_spend * (1 + percent_change / 100)
-        delta = projected_month_spend - actual_month_spend
+        projected_spend = actual_spend * (1 + percent_change / 100)
+        delta = projected_spend - actual_spend
 
     return SimulateResponse(
         current_balance=round(current_balance, 2),
-        actual_month_spend=round(actual_month_spend, 2),
-        projected_month_spend=round(projected_month_spend, 2),
+        actual_spend=round(actual_spend, 2),
+        projected_spend=round(projected_spend, 2),
         projected_balance=round(current_balance - delta, 2),
     )

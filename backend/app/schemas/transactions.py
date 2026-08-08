@@ -29,6 +29,6 @@ class CategorySpend(BaseModel):
 
 class SimulateResponse(BaseModel):
     current_balance: float
-    actual_month_spend: float
-    projected_month_spend: float
+    actual_spend: float
+    projected_spend: float
     projected_balance: float
