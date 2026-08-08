@@ -16,9 +16,6 @@
   --success-bg: #ecfdf3;
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
-
-  --radius-card: 1rem;
-  --radius-control: 0.625rem;
 }
 
 @theme inline {
@@ -38,8 +35,8 @@
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
 
-  --radius-card: var(--radius-card);
-  --radius-control: var(--radius-control);
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
