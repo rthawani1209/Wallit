@@ -104,3 +104,11 @@ body {
   0%, 100% { opacity: 0.18; }
   50% { opacity: 0.32; }
 }
+@keyframes auth-ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.06); opacity: 0.9; }
+}
+@keyframes auth-ring-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
