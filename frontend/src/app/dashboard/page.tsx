@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Wallet } from "lucide-react";
+import { Menu, Wallet } from "lucide-react";
 import { api, Account, Category, CategorySpend, Transaction } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [spendSummary, setSpendSummary] = useState<CategorySpend[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     api.auth.me()
@@ -78,18 +79,33 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      <Sidebar userEmail={user.email} accounts={accounts} onLogout={handleLogout} />
+      <Sidebar
+        userEmail={user.email}
+        accounts={accounts}
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       <main className="flex-1 overflow-y-auto flex flex-col min-w-0">
         <header
-          className="sticky top-0 z-10 border-b border-border px-8 py-4 flex-shrink-0"
+          className="sticky top-0 z-10 border-b border-border px-4 md:px-8 py-4 flex-shrink-0 flex items-center gap-3"
           style={{ background: "rgba(7,16,31,0.85)", backdropFilter: "blur(12px)" }}
         >
-          <h1 className="text-[18px] font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{today} · Your financial snapshot</p>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            className="md:hidden text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-[18px] font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">{today} · Your financial snapshot</p>
+          </div>
         </header>
 
-        <div className="px-8 py-6 space-y-5 flex-1">
+        <div className="px-4 md:px-8 py-6 space-y-5 flex-1">
           <div
             className="rounded-2xl p-5 relative overflow-hidden"
             style={{ background: "linear-gradient(135deg, #10d98c 0%, #059669 100%)" }}
@@ -128,8 +144,8 @@ export default function DashboardPage() {
               <PlaidConnectButton onSuccess={() => window.location.reload()} />
             </Card>
           ) : (
-            <div className="grid grid-cols-3 gap-5">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="md:col-span-2">
                 <TransactionList
                   transactions={transactions}
                   categories={categories}
@@ -137,7 +153,7 @@ export default function DashboardPage() {
                 />
               </div>
               <SpendChart data={spendSummary} />
-              <div className="col-span-3">
+              <div className="md:col-span-3">
                 <WhatIfSimulator categories={categories} />
               </div>
             </div>
