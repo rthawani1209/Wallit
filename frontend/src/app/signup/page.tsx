@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthDivider, GoogleButton } from "@/components/auth/GoogleButton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -46,6 +47,9 @@ export default function SignupPage() {
         Create your account
       </h1>
       <p className="text-sm text-muted-foreground mb-6">Start tracking your finances with Wallit</p>
+
+      <GoogleButton label="Sign up with Google" />
+      <AuthDivider />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthDivider, GoogleButton } from "@/components/auth/GoogleButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,6 +36,9 @@ export default function LoginPage() {
         Welcome back
       </h1>
       <p className="text-sm text-muted-foreground mb-6">Sign in to your Wallit account</p>
+
+      <GoogleButton label="Continue with Google" />
+      <AuthDivider />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
