@@ -1,65 +1,88 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens adopted from the "Finvault" reference design
+ * (Figma export, guidelines/Guidelines.md). Dark-only by design —
+ * the reference defines no separate light theme.
+ */
 :root {
-  --background: #f7f8fa;
-  --foreground: #14161a;
+  --background: #07101f;
+  --foreground: #e8eef5;
 
-  --surface: #ffffff;
-  --border: #e4e6eb;
-  --muted: #6b7280;
+  --card: #0e1828;
+  --card-foreground: #e8eef5;
 
-  --accent: #4338ca;
-  --accent-hover: #3730a3;
-  --accent-foreground: #ffffff;
+  --sidebar: #0a1524;
+  --sidebar-foreground: #e8eef5;
 
-  --success: #16803c;
-  --success-bg: #ecfdf3;
-  --danger: #b91c1c;
-  --danger-bg: #fef2f2;
+  --primary: #10d98c;
+  --primary-foreground: #07101f;
+
+  --secondary: #131f35;
+  --secondary-foreground: #e8eef5;
+
+  --muted: #1a2640;
+  --muted-foreground: #6b7fa3;
+
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+
+  --warning: #f59e0b;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --input: #131f35;
+  --ring: #10d98c;
+
+  --chart-1: #10d98c;
+  --chart-2: #6366f1;
+  --chart-3: #f59e0b;
+  --chart-4: #f43f5e;
+  --chart-5: #8b5cf6;
+
+  --radius: 0.875rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  --color-surface: var(--surface);
-  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
   --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
 
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 
-  --color-success: var(--success);
-  --color-success-bg: var(--success-bg);
-  --color-danger: var(--danger);
-  --color-danger-bg: var(--danger-bg);
+  --color-warning: var(--warning);
 
-  --radius-card: 1rem;
-  --radius-control: 0.625rem;
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0c;
-    --foreground: #ededef;
+  --radius-sm: calc(0.875rem - 4px);
+  --radius-md: calc(0.875rem - 2px);
+  --radius-lg: 0.875rem;
+  --radius-xl: calc(0.875rem + 4px);
 
-    --surface: #17181c;
-    --border: #2a2c32;
-    --muted: #9297a3;
-
-    --accent: #818cf8;
-    --accent-hover: #a5b4fc;
-    --accent-foreground: #0a0a0c;
-
-    --success: #4ade80;
-    --success-bg: #14291d;
-    --danger: #f87171;
-    --danger-bg: #2c1616;
-  }
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-dm-mono);
 }
 
 body {
