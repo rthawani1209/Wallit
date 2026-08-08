@@ -65,8 +65,15 @@ export function WhatIfSimulator({ categories }: { categories: Category[] }) {
         step={5}
         value={percent}
         onChange={(e) => setPercent(Number(e.target.value))}
-        className="w-full accent-primary mb-6"
+        className="w-full accent-primary mb-3"
       />
+
+      {result && (
+        <p className="text-xs text-muted-foreground mb-3">
+          Based on {fmt(result.actual_month_spend)} spent on {categoryLabel} so far this month — the
+          percentage applies to that amount, not your total balance.
+        </p>
+      )}
 
       {result && (
         <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-3">
