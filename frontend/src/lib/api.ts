@@ -20,21 +20,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   auth: {
-    signup: (email: string, password: string) =>
-      request<{ id: string; email: string }>("/api/v1/auth/signup", {
+    signup: (fields: {
+      email: string;
+      password: string;
+      first_name: string;
+      last_name: string;
+      date_of_birth: string; // YYYY-MM-DD
+    }) =>
+      request<User>("/api/v1/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(fields),
       }),
 
     login: (email: string, password: string) =>
-      request<{ id: string; email: string }>("/api/v1/auth/login", {
+      request<User>("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
 
     logout: () => request<void>("/api/v1/auth/logout", { method: "POST" }),
 
-    me: () => request<{ id: string; email: string }>("/api/v1/auth/me"),
+    me: () => request<User>("/api/v1/auth/me"),
   },
 
   plaid: {
@@ -101,6 +107,13 @@ export const api = {
     return request<SimulateResult>(`/api/v1/simulate?${params.toString()}`);
   },
 };
+
+export interface User {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+}
 
 export interface Account {
   id: string;

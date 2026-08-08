@@ -15,7 +15,13 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(email=body.email, password_hash=hash_password(body.password))
+    user = User(
+        email=body.email,
+        password_hash=hash_password(body.password),
+        first_name=body.first_name,
+        last_name=body.last_name,
+        date_of_birth=body.date_of_birth,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)

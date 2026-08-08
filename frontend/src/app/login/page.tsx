@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,51 +30,50 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold mb-6 text-foreground tracking-tight">
-          Sign in to Wallit
-        </h1>
+    <AuthLayout>
+      <h1 className="text-2xl font-bold mb-1 text-foreground tracking-tight">
+        Welcome back
+      </h1>
+      <p className="text-sm text-muted-foreground mb-6">Sign in to your Wallit account</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button
-            type="submit"
-            loading={loading}
-            loadingText="Signing in…"
-            className="w-full"
-          >
-            Sign in
-          </Button>
-        </form>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        {error && <p className="text-destructive text-sm">{error}</p>}
+        <Button
+          type="submit"
+          loading={loading}
+          loadingText="Signing in…"
+          className="w-full"
+        >
+          Sign in
+        </Button>
+      </form>
 
-        <p className="mt-4 text-sm text-center text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-primary hover:underline">
-            Sign up
-          </Link>
-        </p>
-      </Card>
-    </main>
+      <p className="mt-6 text-sm text-center text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="text-primary hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </AuthLayout>
   );
 }

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Text
+from sqlalchemy import Column, Date, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -14,6 +14,11 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     # Nullable — a user who signed up via Google/Apple has no local password
     password_hash = Column(String, nullable=True)
+    # Nullable at the DB level so existing rows aren't broken by this column —
+    # required by the signup request schema for all new accounts.
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # Plaid access token stored encrypted — never log this field
     plaid_access_token = Column(Text, nullable=True)
