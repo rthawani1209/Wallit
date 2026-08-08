@@ -13,6 +13,12 @@ interface SidebarProps {
 
 const navItems = [{ icon: LayoutDashboard, label: "Dashboard" }];
 
+const GRID_BACKGROUND = {
+  backgroundImage:
+    "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+  backgroundSize: "32px 32px",
+};
+
 function fmt(val: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -36,22 +42,31 @@ export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: Side
         />
       )}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border transition-transform duration-200 md:translate-x-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border transition-transform duration-200 md:translate-x-0 relative overflow-hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="px-5 py-5 border-b border-border">
+      <div className="absolute inset-0 pointer-events-none" style={GRID_BACKGROUND} />
+      <div
+        className="absolute -top-20 -left-20 w-64 h-64 rounded-full opacity-[0.12] blur-3xl pointer-events-none"
+        style={{ background: "radial-gradient(circle, #10d98c, transparent 70%)" }}
+      />
+
+      <div className="relative px-5 py-5 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center">
-            <Wallet className="w-4 h-4 text-primary-foreground" />
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_rgba(16,217,140,0.45)]">
+            <Wallet className="w-4.5 h-4.5 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-[15px] tracking-tight text-sidebar-foreground">
+          <span
+            className="font-bold text-lg tracking-tight bg-clip-text text-transparent"
+            style={{ backgroundImage: "linear-gradient(135deg, #ffffff 30%, #7de8c4 100%)" }}
+          >
             Wallit
           </span>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto">
+      <nav className="relative flex-1 px-3 pt-4 pb-2 overflow-y-auto">
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Workspace
         </p>
@@ -59,8 +74,9 @@ export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: Side
           {navItems.map(({ icon: Icon, label }) => (
             <div
               key={label}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium bg-primary/10 text-primary"
+              className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium bg-primary/10 text-primary shadow-[0_0_16px_-4px_rgba(16,217,140,0.4)]"
             >
+              <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary shadow-[0_0_8px_rgba(16,217,140,0.8)]" />
               <Icon className="w-4 h-4 flex-shrink-0" />
               {label}
             </div>
@@ -79,8 +95,12 @@ export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: Side
                 key={a.id}
                 className="flex items-center justify-between px-3 py-2 rounded-md"
               >
-                <span className="text-xs text-muted-foreground truncate flex-1 min-w-0 pr-2">
-                  {a.name}
+                <span className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ background: a.type === "credit" ? "#f43f5e" : "#10d98c" }}
+                  />
+                  <span className="text-xs text-muted-foreground truncate">{a.name}</span>
                 </span>
                 <span className="text-xs font-mono font-medium text-sidebar-foreground flex-shrink-0">
                   {a.current_balance !== null ? fmt(a.current_balance) : "—"}
@@ -91,9 +111,9 @@ export function Sidebar({ userEmail, accounts, onLogout, isOpen, onClose }: Side
         )}
       </nav>
 
-      <div className="px-3 py-3 border-t border-border">
+      <div className="relative px-3 py-3 border-t border-border">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-md">
-          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-[11px] font-bold text-primary-foreground flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-[11px] font-bold text-primary-foreground flex-shrink-0 shadow-[0_0_14px_rgba(16,217,140,0.5)]">
             {initials(userEmail)}
           </div>
           <div className="flex-1 min-w-0">

@@ -11,7 +11,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+  primary:
+    "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_0_0_rgba(16,217,140,0)] hover:shadow-[0_0_20px_-4px_rgba(16,217,140,0.7)]",
   destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
   secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
   outline: "border border-border bg-transparent text-foreground hover:bg-secondary",
@@ -30,7 +31,7 @@ export function Button({
   return (
     <button
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 ${variantClasses[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 ${variantClasses[variant]} ${className}`}
       {...props}
     >
       {loading ? loadingText ?? "Loading…" : children}

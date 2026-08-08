@@ -134,7 +134,20 @@ export default function DashboardPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      <main className="flex-1 overflow-y-auto flex flex-col min-w-0">
+      <main className="flex-1 overflow-y-auto flex flex-col min-w-0 relative">
+        <div
+          className="fixed inset-0 pointer-events-none opacity-[0.4]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+        <div
+          className="fixed top-0 right-0 w-[36rem] h-[36rem] rounded-full opacity-[0.06] blur-3xl pointer-events-none"
+          style={{ background: "radial-gradient(circle, #10d98c, transparent 70%)" }}
+        />
+
         <header
           className="sticky top-0 z-10 border-b border-border px-4 md:px-8 py-4 flex-shrink-0 flex items-center gap-3"
           style={{ background: "rgba(7,16,31,0.85)", backdropFilter: "blur(12px)" }}
@@ -152,11 +165,19 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <div className="px-4 md:px-8 py-6 space-y-5 flex-1">
+        <div className="relative px-4 md:px-8 py-6 space-y-5 flex-1">
           <div
-            className="rounded-2xl p-5 relative overflow-hidden"
+            className="rounded-2xl p-5 relative overflow-hidden shadow-[0_0_40px_-12px_rgba(16,217,140,0.5)]"
             style={{ background: "linear-gradient(135deg, #10d98c 0%, #059669 100%)" }}
           >
+            <div
+              className="absolute inset-0 opacity-[0.15]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
+                backgroundSize: "20px 20px",
+              }}
+            />
             <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
@@ -178,7 +199,17 @@ export default function DashboardPage() {
                 })}
               </div>
               {accounts.length > 0 && (
-                <div className="text-xs font-semibold" style={{ color: "rgba(7,16,31,0.7)" }}>
+                <div
+                  className="flex items-center gap-1.5 text-xs font-semibold"
+                  style={{ color: "rgba(7,16,31,0.7)" }}
+                >
+                  <span className="relative flex w-1.5 h-1.5">
+                    <span
+                      className="absolute inline-flex h-full w-full rounded-full opacity-75"
+                      style={{ background: "#07101f", animation: "auth-glow-pulse 2s ease-in-out infinite" }}
+                    />
+                    <span className="relative inline-flex rounded-full w-1.5 h-1.5" style={{ background: "#07101f" }} />
+                  </span>
                   {accounts.length} account{accounts.length !== 1 ? "s" : ""} connected
                 </div>
               )}
