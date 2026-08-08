@@ -33,7 +33,9 @@ PLAID_PRIMARY_MAP: dict[str, str] = {
     "TRANSPORTATION": "Transportation",
     "TRAVEL": "Transportation",
     "RENT_AND_UTILITIES": "Housing",  # refined below via `detailed`
-    "OTHER": "Fees/Other",
+    # Deliberately no "OTHER" entry: that's Plaid's own "I don't know" signal, not a
+    # confident classification — treating it as unmapped lets keyword/Claude fallback
+    # tiers take a real shot instead of dumping it straight into Fees/Other.
 }
 
 # RENT_AND_UTILITIES covers both rent/mortgage and utility bills under one Plaid
