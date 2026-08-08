@@ -163,8 +163,10 @@ export default function DashboardPage() {
 
 function PlaidConnectButton({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleClick() {
+    setError("");
     setLoading(true);
     try {
       const { link_token } = await api.plaid.createLinkToken();
@@ -177,8 +179,14 @@ function PlaidConnectButton({ onSuccess }: { onSuccess: () => void }) {
         const handler = window.Plaid.create({
           token: link_token,
           onSuccess: async (public_token: string) => {
-            await api.plaid.exchangeToken(public_token);
-            onSuccess();
+            try {
+              await api.plaid.exchangeToken(public_token);
+              onSuccess();
+            } catch (err) {
+              console.error(err);
+              setError(err instanceof Error ? err.message : "Failed to connect bank account");
+              setLoading(false);
+            }
           },
           onExit: () => setLoading(false),
         });
@@ -187,13 +195,17 @@ function PlaidConnectButton({ onSuccess }: { onSuccess: () => void }) {
       document.head.appendChild(script);
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to connect bank account");
       setLoading(false);
     }
   }
 
   return (
-    <Button onClick={handleClick} loading={loading} loadingText="Opening Plaid…">
-      Connect bank account
-    </Button>
+    <div>
+      <Button onClick={handleClick} loading={loading} loadingText="Opening Plaid…">
+        Connect bank account
+      </Button>
+      {error && <p className="text-destructive text-sm mt-3">{error}</p>}
+    </div>
   );
 }
