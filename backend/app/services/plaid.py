@@ -92,6 +92,7 @@ def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[lis
             "merchant_name": t.get("merchant_name") or t.get("name"),
             "date": t["date"],
             "plaid_account_id": t["account_id"],
+            "personal_finance_category": t.get("personal_finance_category"),
         }
         for t in all_added
     ]

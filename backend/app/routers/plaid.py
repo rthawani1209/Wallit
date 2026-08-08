@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -60,9 +62,20 @@ def exchange_token(
     account_map = {a.plaid_account_id: a.id for a in db_accounts}
     category_map = {c.name: c.id for c in db.query(Category).all()}
 
-    transactions, _ = plaid_service.sync_transactions(access_token)
+    transactions, cursor = plaid_service.sync_transactions(access_token)
+    # Right after linking, Plaid may still be generating/enriching the item's
+    # transaction history — the first sync call can return a partial batch with
+    # personal_finance_category missing on recent entries. An empty poll doesn't
+    # mean backfill is done (just that nothing new landed yet), so keep polling
+    # for a fixed budget rather than stopping at the first empty result.
+    for _ in range(5):
+        time.sleep(2)
+        more, cursor = plaid_service.sync_transactions(access_token, cursor)
+        transactions.extend(more)
+
     for t in transactions:
         plaid_acct_id = t.pop("plaid_account_id")
+        pfc = t.pop("personal_finance_category")
         account_id = account_map.get(plaid_acct_id)
         if not account_id:
             continue
@@ -70,8 +83,8 @@ def exchange_token(
             Transaction.plaid_transaction_id == t["plaid_transaction_id"]
         ).first()
         if not existing:
-            category_name = categorization.categorize(t.get("merchant_name"))
-            category_id = category_map.get(category_name) if category_name else None
+            category_name = categorization.resolve_category(t.get("merchant_name"), pfc)
+            category_id = category_map.get(category_name) or category_map.get(categorization.FALLBACK_CATEGORY)
             db.add(Transaction(account_id=account_id, category_id=category_id, **t))
     db.commit()
 
