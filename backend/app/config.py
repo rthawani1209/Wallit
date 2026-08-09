@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     # Encryption key for Plaid access tokens
     encryption_key: str = ""
 
-    # Anthropic (Claude API) — categorization fallback, later the AI chat / NL query feature
+    # Anthropic (Claude API) — categorization fallback, and the AI chat / NL query feature
     anthropic_api_key: str = ""
+
+    # Google Places API — chatbot "cheaper places near me" tool
+    google_places_api_key: str = ""
 
     # Google OAuth (login/signup with Google)
     google_client_id: str = ""
