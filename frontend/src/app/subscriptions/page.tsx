@@ -35,7 +35,7 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([api.accounts.getAll(), api.subscriptions.getAll()])
+    Promise.all([api.accounts.getAll(), api.subscriptions.getAll(true)])
       .then(([accts, subs]) => {
         setAccounts(accts);
         setSubscriptions(subs);
@@ -53,7 +53,7 @@ export default function SubscriptionsPage() {
     setSyncing(true);
     try {
       await api.plaid.resync();
-      const [accts, subs] = await Promise.all([api.accounts.getAll(), api.subscriptions.getAll()]);
+      const [accts, subs] = await Promise.all([api.accounts.getAll(), api.subscriptions.getAll(true)]);
       setAccounts(accts);
       setSubscriptions(subs);
       setLastSyncedLabel("just now");

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, RefreshCw, Repeat, Wallet } from "lucide-react";
+import { CalendarDays, LayoutDashboard, LogOut, RefreshCw, Repeat, Wallet } from "lucide-react";
 import type { Account } from "@/lib/api";
 
 interface SidebarProps {
@@ -18,6 +18,7 @@ interface SidebarProps {
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: CalendarDays, label: "Calendar", href: "/calendar" },
   { icon: Repeat, label: "Subscriptions", href: "/subscriptions" },
 ];
 

@@ -91,7 +91,13 @@ export const api = {
   },
 
   subscriptions: {
-    getAll: () => request<Subscription[]>("/api/v1/subscriptions"),
+    getAll: (discretionaryOnly = false) =>
+      request<Subscription[]>(
+        `/api/v1/subscriptions${discretionaryOnly ? "?discretionary_only=true" : ""}`
+      ),
+
+    getCalendar: (month: string) =>
+      request<CalendarEvent[]>(`/api/v1/subscriptions/calendar?month=${month}`),
   },
 
   budgets: {
@@ -193,8 +199,17 @@ export interface Subscription {
   amount: number;
   billing_interval: string; // "weekly" | "monthly" | "quarterly" | "annual"
   next_estimated_date: string | null;
+  category_name: string | null;
   cheaper_alternative: string | null;
   is_active: boolean;
+}
+
+export interface CalendarEvent {
+  date: string; // YYYY-MM-DD
+  merchant_name: string;
+  amount: number;
+  category_name: string | null;
+  billing_interval: string;
 }
 
 export interface Anomaly {
