@@ -51,8 +51,17 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     setSelectedDate(null);
-    api.subscriptions.getCalendar(monthKey(monthStart)).then(setEvents).catch(() => {});
+    api.subscriptions
+      .getCalendar(monthKey(monthStart))
+      .then((data) => {
+        if (!cancelled) setEvents(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [user, monthStart]);
 
   async function handleLogout() {
