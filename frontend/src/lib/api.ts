@@ -114,6 +114,16 @@ export const api = {
     getAll: () => request<Category[]>("/api/v1/categories"),
   },
 
+  plans: {
+    getAll: () => request<Plan[]>("/api/v1/plans"),
+
+    archive: (id: string) =>
+      request<Plan>(`/api/v1/plans/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: false }),
+      }),
+  },
+
   chat: {
     send: (messages: ChatMessage[]) =>
       request<{ message: string }>("/api/v1/chat", {
@@ -218,6 +228,23 @@ export interface CalendarEvent {
   amount: number;
   category_name: string | null;
   billing_interval: string;
+}
+
+export interface Plan {
+  id: string;
+  type: string;
+  name: string;
+  target_amount: number;
+  target_date: string | null; // YYYY-MM-DD
+  location: string | null;
+  monthly_contribution: number | null;
+  is_active: boolean;
+  created_at: string;
+  saved_amount: number;
+  progress_pct: number;
+  is_achieved: boolean;
+  projected_completion_date: string | null;
+  on_track: boolean | null;
 }
 
 export interface ChatMessage {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
-import { api, Account, Anomaly, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Transaction, UpcomingBill } from "@/lib/api";
+import { api, Account, Anomaly, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Plan, Transaction, UpcomingBill } from "@/lib/api";
 import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,6 +12,7 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { SpendChart } from "@/components/dashboard/SpendChart";
 import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { BudgetProgress } from "@/components/dashboard/BudgetProgress";
+import { SavingsGoals } from "@/components/dashboard/SavingsGoals";
 import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
 import { AnomaliesCard } from "@/components/dashboard/AnomaliesCard";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const [cashFlow, setCashFlow] = useState<CashFlowMonth[]>([]);
   const [budgetProgress, setBudgetProgress] = useState<BudgetProgressData[]>([]);
   const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -99,6 +101,16 @@ export default function DashboardPage() {
     api.transactions.getAnomalies().then(setAnomalies).catch(() => {});
   }, [user, plaidLinked]);
 
+  useEffect(() => {
+    if (!user || !plaidLinked) return;
+    api.plans.getAll().then(setPlans).catch(() => {});
+  }, [user, plaidLinked]);
+
+  async function handleArchivePlan(id: string) {
+    const updated = await api.plans.archive(id);
+    setPlans((prev) => prev.filter((p) => p.id !== updated.id));
+  }
+
   async function handleSetBudget(categoryId: string, limit: number) {
     const updated = await api.budgets.set(categoryId, limit);
     setBudgetProgress((prev) => {
@@ -136,6 +148,7 @@ export default function DashboardPage() {
         api.budgets.getProgress().then(setBudgetProgress),
         api.transactions.getUpcomingBills().then(setUpcomingBills),
         api.transactions.getAnomalies().then(setAnomalies),
+        api.plans.getAll().then(setPlans),
       ]);
       setLastSyncedLabel("just now");
     } catch (err) {
@@ -283,6 +296,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-5">
                   <BudgetProgress data={budgetProgress} onSetLimit={handleSetBudget} />
+                  <SavingsGoals data={plans} onArchive={handleArchivePlan} />
                   <UpcomingBills data={upcomingBills} />
                 </div>
                 <div className="md:col-span-3">

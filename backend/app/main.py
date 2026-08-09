@@ -3,7 +3,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import accounts, auth, budgets, categories, chat, plaid, simulate, subscriptions, transactions
+from app.routers import (
+    accounts,
+    auth,
+    budgets,
+    categories,
+    chat,
+    plaid,
+    plans,
+    simulate,
+    subscriptions,
+    transactions,
+)
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 
@@ -35,6 +46,7 @@ app.include_router(simulate.router, prefix="/api/v1")
 app.include_router(budgets.router, prefix="/api/v1")
 app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(plans.router, prefix="/api/v1")
 
 
 @app.get("/health")

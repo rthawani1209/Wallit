@@ -19,8 +19,17 @@ from app.models.category import Category
 from app.models.subscription import Subscription
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.services.budgets import BudgetUpsertError, upsert_budget
 from app.services.detection import NON_DISCRETIONARY_CATEGORIES, project_occurrences
 from app.services.places import search_places
+from app.services.plans import (
+    PlanError,
+    create_plan,
+    find_plan_by_name,
+    list_plans,
+    to_response as plan_to_response,
+    update_plan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +233,123 @@ def _tool_search_nearby_places(db: Session, user: User, **params) -> dict:
     return search_places(query=query, location=location, max_results=int(params.get("max_results") or 5))
 
 
+def _tool_check_affordability(db: Session, user: User, **params) -> dict:
+    amount = params.get("amount")
+    if not amount or amount <= 0:
+        return {"error": "amount must be a positive number"}
+
+    accounts = db.query(Account).filter(Account.user_id == user.id).all()
+    current_balance = sum(float(a.current_balance) for a in accounts if a.current_balance is not None)
+
+    subs = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == user.id, Subscription.is_active.is_(True))
+        .all()
+    )
+    today = date.today()
+    window_end = today + timedelta(days=30)
+    upcoming_committed = sum(
+        float(sub.amount) * len(project_occurrences(sub, today, window_end)) for sub in subs
+    )
+
+    goals = list_plans(db, user)
+    monthly_goal_commitment = sum(float(g.monthly_contribution) for g in goals if g.monthly_contribution)
+
+    buffer_after = round(current_balance - upcoming_committed - monthly_goal_commitment - amount, 2)
+
+    return {
+        "purchase_amount": amount,
+        "current_balance": round(current_balance, 2),
+        "upcoming_committed_next_30_days": round(upcoming_committed, 2),
+        "active_savings_goal_monthly_commitments": round(monthly_goal_commitment, 2),
+        "buffer_after_purchase": buffer_after,
+        "note": (
+            "buffer_after_purchase is what's left after this purchase, the next 30 days of bills/"
+            "subscriptions, and this month's pledged savings-goal contributions. Negative means this "
+            "purchase would eat into money already committed elsewhere."
+        ),
+    }
+
+
+def _tool_get_savings_goals(db: Session, user: User, **params) -> dict:
+    include_inactive = bool(params.get("include_inactive", False))
+    goals = list_plans(db, user, include_inactive=include_inactive)
+    return {"goals": [plan_to_response(g).model_dump(mode="json") for g in goals]}
+
+
+def _tool_create_savings_goal(db: Session, user: User, **params) -> dict:
+    name = params.get("name")
+    target_amount = params.get("target_amount")
+    if not name or not target_amount:
+        return {"error": "name and target_amount are required"}
+
+    target_date = None
+    if params.get("target_date"):
+        try:
+            target_date = date.fromisoformat(params["target_date"])
+        except ValueError:
+            return {"error": "target_date must be YYYY-MM-DD"}
+
+    try:
+        plan = create_plan(
+            db,
+            user,
+            name=name,
+            target_amount=target_amount,
+            target_date=target_date,
+            monthly_contribution=params.get("monthly_contribution"),
+        )
+    except PlanError as e:
+        return {"error": str(e)}
+    return plan_to_response(plan).model_dump(mode="json")
+
+
+def _tool_update_savings_goal(db: Session, user: User, **params) -> dict:
+    name = params.get("name")
+    if not name:
+        return {"error": "name is required to find the goal"}
+    plan = find_plan_by_name(db, user, name)
+    if not plan:
+        return {"error": f"No active savings goal matching {name!r}."}
+
+    fields = {}
+    if params.get("target_amount") is not None:
+        fields["target_amount"] = params["target_amount"]
+    if params.get("monthly_contribution") is not None:
+        fields["monthly_contribution"] = params["monthly_contribution"]
+    if params.get("target_date"):
+        try:
+            fields["target_date"] = date.fromisoformat(params["target_date"])
+        except ValueError:
+            return {"error": "target_date must be YYYY-MM-DD"}
+    if params.get("mark_complete_or_cancel"):
+        fields["is_active"] = False
+
+    try:
+        plan = update_plan(db, user, plan.id, **fields)
+    except PlanError as e:
+        return {"error": str(e)}
+    return plan_to_response(plan).model_dump(mode="json")
+
+
+def _tool_adjust_budget(db: Session, user: User, **params) -> dict:
+    category_name = params.get("category_name")
+    new_monthly_limit = params.get("new_monthly_limit")
+    if not category_name or not new_monthly_limit:
+        return {"error": "category_name and new_monthly_limit are required"}
+
+    category = db.query(Category).filter(Category.name.ilike(category_name)).first()
+    if not category:
+        valid = ", ".join(sorted(c.name for c in db.query(Category).all()))
+        return {"error": f"No category named {category_name!r}. Valid categories: {valid}"}
+
+    try:
+        progress = upsert_budget(db, user, category.id, new_monthly_limit)
+    except BudgetUpsertError as e:
+        return {"error": str(e)}
+    return progress.model_dump(mode="json")
+
+
 TOOL_HANDLERS = {
     "get_transactions": _tool_get_transactions,
     "get_spending_by_category": _tool_get_spending_by_category,
@@ -232,6 +358,11 @@ TOOL_HANDLERS = {
     "get_account_balances": _tool_get_account_balances,
     "get_spending_anomalies": _tool_get_spending_anomalies,
     "search_nearby_places": _tool_search_nearby_places,
+    "check_affordability": _tool_check_affordability,
+    "get_savings_goals": _tool_get_savings_goals,
+    "create_savings_goal": _tool_create_savings_goal,
+    "update_savings_goal": _tool_update_savings_goal,
+    "adjust_budget": _tool_adjust_budget,
 }
 
 TOOL_DEFINITIONS = [
@@ -297,6 +428,92 @@ TOOL_DEFINITIONS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "check_affordability",
+        "description": (
+            "Check whether the user can afford a specific one-time purchase, weighing it against their "
+            "current balance, upcoming bills/subscriptions in the next 30 days, and any money already "
+            "pledged toward active savings goals. Use for 'can I afford X' / 'should I buy X' questions — "
+            "never estimate this yourself, always call the tool."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "amount": {"type": "number", "description": "The purchase price to check."},
+                "description": {"type": "string", "description": "What the purchase is, for context in your answer."},
+            },
+            "required": ["amount"],
+        },
+    },
+    {
+        "name": "get_savings_goals",
+        "description": (
+            "List the user's savings goals (e.g. a trip fund) with computed progress: saved_amount, "
+            "progress_pct, is_achieved, whether it's on_track for its target_date, and "
+            "projected_completion_date at the current pace."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "include_inactive": {"type": "boolean", "description": "Include archived/cancelled goals. Default false."},
+            },
+        },
+    },
+    {
+        "name": "create_savings_goal",
+        "description": (
+            "Create a new savings goal (e.g. a trip fund). WRITE ACTION — only call this after you've "
+            "already told the user, in a prior message, the specific name/target_amount/"
+            "monthly_contribution you're about to set up, and they've confirmed. Never call this in the "
+            "same turn you first propose the numbers."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "e.g. 'Japan Trip'"},
+                "target_amount": {"type": "number"},
+                "target_date": {"type": "string", "description": "YYYY-MM-DD, optional — when they want to reach the goal by."},
+                "monthly_contribution": {"type": "number", "description": "How much to pledge toward this goal per month, optional."},
+            },
+            "required": ["name", "target_amount"],
+        },
+    },
+    {
+        "name": "update_savings_goal",
+        "description": (
+            "Adjust an existing savings goal's target, monthly contribution, or target date, or archive it "
+            "(mark_complete_or_cancel) once achieved or abandoned. WRITE ACTION — same confirm-first rule "
+            "as create_savings_goal: propose the change, wait for the user to confirm, then call this."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Name (or partial name) of the existing goal to update."},
+                "target_amount": {"type": "number"},
+                "monthly_contribution": {"type": "number"},
+                "target_date": {"type": "string", "description": "YYYY-MM-DD"},
+                "mark_complete_or_cancel": {"type": "boolean", "description": "Set true to archive this goal (achieved or no longer wanted)."},
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "adjust_budget",
+        "description": (
+            "Set a user's monthly spending limit for a category (their existing Budgets feature, shown on "
+            "the dashboard). WRITE ACTION — only call this after proposing the exact category and new "
+            "limit in a prior message and the user has confirmed. Never call this in the same turn you "
+            "first propose the numbers."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category_name": {"type": "string", "description": "Exact category name, e.g. 'Food', 'Entertainment', 'Transportation'."},
+                "new_monthly_limit": {"type": "number"},
+            },
+            "required": ["category_name", "new_monthly_limit"],
+        },
+    },
+    {
         "name": "search_nearby_places",
         "description": (
             "Search Google Places for cheaper food/entertainment/errand options near a location, sorted "
@@ -336,6 +553,18 @@ def _system_prompt() -> str:
         "'last month') yourself from today's date and pass explicit start_date/end_date to the tools.\n\n"
         "For 'cheaper places to eat/go' questions, use search_nearby_places — ask the user for their "
         "location first if they haven't given one.\n\n"
+        "For 'can I afford X' / 'should I buy X' questions, use check_affordability rather than eyeballing "
+        "a balance — it already accounts for upcoming bills and savings-goal commitments.\n\n"
+        "You can also set up and manage savings goals (create_savings_goal, update_savings_goal, "
+        "get_savings_goals) and adjust category budget limits (adjust_budget) — e.g. helping someone free "
+        "up money each month toward a trip by trimming other categories. These four are WRITE actions with "
+        "a hard rule: when you're proposing to create a goal or change a budget/goal, describe the exact "
+        "numbers in your reply (which categories, by how much, the resulting monthly total) and ask the "
+        "user to confirm — do NOT call the write tool in that same turn. Only call it after the user's next "
+        "message clearly confirms (e.g. 'yes', 'do it', 'sounds good'). get_savings_goals and "
+        "check_affordability are read-only — call those freely, no confirmation needed. When proposing "
+        "budget cuts, first call get_spending_by_category and get_subscriptions_and_bills so the categories/"
+        "amounts you suggest are grounded in what the user actually spends, not guessed.\n\n"
         "You are not a licensed financial advisor: don't give personalized investment or trading advice "
         "(which stock/crypto to buy, market timing, etc.) — if asked, say so briefly and, if relevant, stick "
         "to what you can help with (budgeting, spending, subscriptions).\n\n"
