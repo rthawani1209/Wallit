@@ -32,3 +32,20 @@ def decode_access_token(token: str) -> str | None:
         return payload.get("sub")
     except JWTError:
         return None
+
+
+def create_oauth_state() -> str:
+    """Short-lived signed token used as the Google OAuth 'state' param — verified
+    on its own signature rather than a stored cookie, since that cookie has to
+    survive a redirect out to Google and back (and, in production, a same-domain
+    proxy on top of that), which is a fragile round-trip for a cookie to survive."""
+    payload = {"purpose": "oauth_state", "exp": datetime.now(timezone.utc) + timedelta(minutes=10)}
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def verify_oauth_state(token: str) -> bool:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return payload.get("purpose") == "oauth_state"
+    except JWTError:
+        return False

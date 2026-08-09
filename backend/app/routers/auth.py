@@ -1,6 +1,4 @@
-import secrets
-
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -11,7 +9,7 @@ from app.models.linked_identity import LinkedIdentity
 from app.models.user import User
 from app.schemas.auth import LoginRequest, SignupRequest, UserResponse
 from app.services import google_oauth
-from app.services.auth import create_access_token, hash_password, verify_password
+from app.services.auth import create_access_token, create_oauth_state, hash_password, verify_oauth_state, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -74,26 +72,14 @@ def me(current_user: User = Depends(get_current_user)):
 @router.get("/google/start")
 def google_start():
     """Step 1 of Google sign-in: send the browser to Google's consent screen."""
-    state = secrets.token_urlsafe(24)
-    redirect = RedirectResponse(google_oauth.build_authorize_url(state))
-    # Short-lived, httpOnly — just needs to survive the round trip to Google and back
-    # so /callback can confirm this request actually came from a flow we started.
-    redirect.set_cookie(
-        key="oauth_state",
-        value=state,
-        httponly=True,
-        samesite=settings.cookie_samesite,
-        secure=settings.is_production,
-        max_age=600,
-    )
-    return redirect
+    state = create_oauth_state()
+    return RedirectResponse(google_oauth.build_authorize_url(state))
 
 
 @router.get("/google/callback")
-def google_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
+def google_callback(code: str, state: str, db: Session = Depends(get_db)):
     """Step 2: Google redirects back here with a one-time authorization code."""
-    expected_state = request.cookies.get("oauth_state")
-    if not expected_state or expected_state != state:
+    if not verify_oauth_state(state):
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
     try:
@@ -131,5 +117,4 @@ def google_callback(code: str, state: str, request: Request, db: Session = Depen
 
     redirect = RedirectResponse(f"{settings.frontend_url}/dashboard")
     _set_auth_cookie(redirect, str(user.id))
-    redirect.delete_cookie("oauth_state")
     return redirect
