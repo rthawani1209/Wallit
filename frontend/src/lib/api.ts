@@ -114,6 +114,14 @@ export const api = {
     getAll: () => request<Category[]>("/api/v1/categories"),
   },
 
+  chat: {
+    send: (messages: ChatMessage[]) =>
+      request<{ message: string }>("/api/v1/chat", {
+        method: "POST",
+        body: JSON.stringify({ messages }),
+      }),
+  },
+
   simulate: (percentChange: number, categoryId?: string, range?: DateRange) => {
     const params = new URLSearchParams({ percent_change: String(percentChange) });
     if (categoryId) params.set("category_id", categoryId);
@@ -210,6 +218,11 @@ export interface CalendarEvent {
   amount: number;
   category_name: string | null;
   billing_interval: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 export interface Anomaly {
