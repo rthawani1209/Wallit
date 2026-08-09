@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Send, Sparkles } from "lucide-react";
 import { api, Account, ChatMessage, User } from "@/lib/api";
+import { getStoredMessages, setStoredMessages } from "@/lib/chatStore";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MessageBubble } from "@/components/assistant/MessageBubble";
 
@@ -23,7 +24,7 @@ export default function AssistantPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedLabel, setLastSyncedLabel] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => getStoredMessages());
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +44,10 @@ export default function AssistantPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
+
+  useEffect(() => {
+    setStoredMessages(messages);
+  }, [messages]);
 
   async function handleLogout() {
     await api.auth.logout();
