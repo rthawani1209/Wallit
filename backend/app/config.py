@@ -2,6 +2,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # "development" or "production" — controls cookie security flags and CORS below
+    environment: str = "development"
+    # Comma-separated list of origins allowed to call this API with credentials
+    cors_origins: str = "http://localhost:3000"
+
     # Database
     database_url: str
 
@@ -35,6 +40,22 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+    @property
+    def cookie_samesite(self) -> str:
+        # Frontend and backend live on different domains in production (e.g. a
+        # Vercel domain calling a Railway domain), which browsers only send
+        # cookies across for "none" + secure — "lax" is fine for local dev,
+        # where everything's effectively same-site via localhost.
+        return "none" if self.is_production else "lax"
 
 
 settings = Settings()

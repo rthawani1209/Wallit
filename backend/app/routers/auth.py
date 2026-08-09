@@ -22,8 +22,8 @@ def _set_auth_cookie(response: Response, user_id: str) -> None:
         key="access_token",
         value=token,
         httponly=True,   # JS cannot read this — protects against XSS token theft
-        samesite="lax",
-        secure=False,    # Set to True in production (requires HTTPS)
+        samesite=settings.cookie_samesite,
+        secure=settings.is_production,
         max_age=60 * 60 * 24,  # 24 hours
     )
 
@@ -82,8 +82,8 @@ def google_start():
         key="oauth_state",
         value=state,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite=settings.cookie_samesite,
+        secure=settings.is_production,
         max_age=600,
     )
     return redirect

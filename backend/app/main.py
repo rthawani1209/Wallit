@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.routers import (
     accounts,
     auth,
@@ -27,11 +28,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Wallit API", version="0.1.0", lifespan=lifespan)
 
-# Allow the Next.js frontend (running on port 3000) to call this API.
+# CORS_ORIGINS in .env controls which frontend(s) can call this API.
 # credentials=True is required so cookies (our JWT) are sent cross-origin.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
