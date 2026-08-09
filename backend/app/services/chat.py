@@ -313,6 +313,11 @@ TOOL_DEFINITIONS = [
             },
             "required": ["query", "location"],
         },
+        # Marks the end of the (identical-on-every-call) system+tools prefix as a cache
+        # breakpoint — Anthropic caches everything up to here, so the tool loop's second+
+        # call, and every later turn in the conversation, reads this ~1k-token block from
+        # cache (~90% cheaper) instead of paying full price for it again.
+        "cache_control": {"type": "ephemeral"},
     },
 ]
 
@@ -357,7 +362,7 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
             response = client.messages.create(
                 model=MODEL,
                 max_tokens=1024,
-                system=_system_prompt(),
+                system=[{"type": "text", "text": _system_prompt()}],
                 tools=TOOL_DEFINITIONS,
                 messages=conversation,
             )
