@@ -180,12 +180,8 @@ BILL_LIKE_CATEGORIES = {"Subscriptions", "Utilities", "Housing", "Debt"}
 
 @router.get("/upcoming-bills", response_model=list[UpcomingBill])
 def get_upcoming_bills(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Detects recurring monthly charges (2+ occurrences of the same merchant at a
-    roughly-monthly cadence and consistent amount, in a bill-like category) from
-    transaction history and predicts each one's next due date — no separate
-    bill-entry step required.
-    """
+    """Detects recurring monthly charges from transaction history and predicts each
+    one's next due date, so there's no separate bill-entry step."""
     account_ids = _user_account_ids(db, current_user.id)
     lookback_start = date.today() - timedelta(days=120)
 

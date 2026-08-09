@@ -67,10 +67,8 @@ def get_accounts(access_token: str) -> list[dict]:
 
 
 def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[list[dict], str]:
-    """
-    Pull transactions using Plaid's sync API (returns only what's new/changed since last sync).
-    Returns a list of transaction dicts and the new cursor to store for next time.
-    """
+    """Pull new/changed transactions via Plaid's sync API. Returns the transactions
+    and the new cursor to store for next time."""
     client = _get_client()
     all_added = []
     has_more = True

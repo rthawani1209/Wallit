@@ -1,8 +1,5 @@
-"""
-Budget progress computation and the set/upsert-a-limit action — shared by the
-REST router (routers/budgets.py) and the chatbot's adjust_budget tool
-(services/chat.py) so both write through the exact same logic.
-"""
+"""Budget progress computation and the set/upsert-a-limit action, shared by the
+REST router and the chatbot's adjust_budget tool."""
 import uuid
 from datetime import date
 
@@ -41,13 +38,8 @@ def _suggest_limit(avg_recent_spend: float) -> float:
 
 
 def get_budget_progress(db: Session, user: User) -> list[BudgetProgress]:
-    """
-    Budget vs actual spend for the current month, per category.
-
-    A category only gets an entry here if it has a user-set limit, spend this
-    month, or spend history to suggest a limit from — categories with no
-    activity at all are omitted rather than shown as an empty 0/$20 bar.
-    """
+    """Budget vs actual spend for the current month, per category. A category is
+    omitted if it has no user-set limit, spend, or history to suggest one from."""
     account_ids = _user_account_ids(db, user.id)
     today = date.today()
     month_start = _month_start(today)

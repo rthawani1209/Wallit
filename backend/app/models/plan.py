@@ -17,10 +17,9 @@ class Plan(Base):
     target_amount = Column(Numeric(12, 2), nullable=False)
     target_date = Column(Date, nullable=True)
     location = Column(String, nullable=True)
-    # How much gets redirected toward this goal per month — set (and adjusted) by the
-    # user or the chatbot's adjust_budget/propose_or_create_savings_goal tools. Progress
-    # is a pledged-pace estimate (monthly_contribution * months elapsed), not a ledger of
-    # verified transfers, since Plaid sandbox data has no reliable "moved to savings" signal.
+    # How much gets redirected toward this goal per month, set by the user or the
+    # chatbot's goal tools. Progress is pledged-pace (contribution * months elapsed),
+    # not a ledger of verified transfers.
     monthly_contribution = Column(Numeric(12, 2), nullable=True)
     # False once a goal is archived/cancelled — kept (not deleted) so history isn't lost.
     is_active = Column(Boolean, default=True, nullable=False)

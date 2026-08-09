@@ -1,8 +1,5 @@
-"""
-Real background scheduling: re-runs subscription/anomaly detection for every user
-with a linked bank account every 24 hours, so a subscription price hike or an unusual
-transaction gets flagged even if the user never opens the app or clicks "Resync."
-"""
+"""Re-runs subscription/anomaly detection for every linked user every 24 hours,
+so a price hike or unusual charge gets flagged without a manual resync."""
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

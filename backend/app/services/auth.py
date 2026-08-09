@@ -19,11 +19,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(user_id: str) -> str:
-    """
-    Create a signed JWT. The token carries the user's id and an expiry timestamp.
-    Anyone who presents this token can act as that user — so we sign it with a
-    secret key so we can verify it wasn't tampered with.
-    """
+    """Signed JWT carrying the user's id and an expiry timestamp."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {"sub": user_id, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)

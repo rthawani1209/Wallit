@@ -1,16 +1,3 @@
-"""
-Subscription and anomaly detection, run after every Plaid sync and on a nightly
-schedule (see app/services/scheduler.py). Two independent passes:
-
-  1. Subscription detection — find merchants that recur at a consistent amount and
-     cadence, persist them as Subscription rows, flag their transactions, and detect
-     price increases on subscriptions we already knew about.
-  2. Category anomaly detection — flag individual transactions that are unusually
-     large relative to the user's own recent history in that category.
-
-Both are best-effort: a failure in one user's detection (e.g. a Claude API outage)
-must never block another user's, and is always caught by the caller.
-"""
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
@@ -29,19 +16,13 @@ ANOMALY_HISTORY_DAYS = 180
 MIN_HISTORY_SAMPLES = 4
 ANOMALY_STDDEV_MULTIPLIER = 2
 ANOMALY_MIN_DOLLAR_GAP = 20
-PRICE_HIKE_THRESHOLD = 1.05  # 5% increase
+PRICE_HIKE_THRESHOLD = 1.05  # 5%
 
-# Recurring transfers and paychecks aren't a "charge" of any kind — everything else
-# (including Debt/Housing, which read as bills rather than subscriptions) is still
-# eligible for detection; NON_DISCRETIONARY_CATEGORIES below is what the Subscriptions
-# page filters out for display, separate from detection itself.
+# Transfers/paychecks aren't charges at all. NON_DISCRETIONARY_CATEGORIES is a
+# looser filter used by the Subscriptions page to hide bills, not by detection itself.
 NON_RECURRING_CHARGE_CATEGORIES = {"Savings", "Income"}
 NON_DISCRETIONARY_CATEGORIES = {"Debt", "Housing", "Savings", "Income"}
 
-
-# Inverse of _classify_interval — used to project a subscription's future occurrence
-# dates for the calendar view. Approximate day-counts, not calendar-exact; fine for a
-# visual calendar, not meant to be a ledger.
 INTERVAL_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 91, "annual": 365}
 
 
@@ -58,19 +39,12 @@ def _classify_interval(avg_days: float) -> str | None:
 
 
 def project_occurrences(sub: Subscription, range_start: date, range_end: date) -> list[date]:
-    """
-    Given a subscription's most recently known due date and billing interval, project
-    every occurrence date that falls within [range_start, range_end] — including past
-    or future months, not just the one next_estimated_date happens to point at. Used
-    by the calendar view, which needs to show occurrences for whatever month the user
-    navigates to, not just the single next charge.
-    """
+    """Occurrence dates for `sub` within [range_start, range_end], in either direction."""
     step = INTERVAL_DAYS.get(sub.billing_interval)
     if not step or not sub.next_estimated_date:
         return []
 
     d = sub.next_estimated_date
-    # Walk to the first occurrence at or after range_start, in whichever direction is needed.
     while d > range_start:
         d -= timedelta(days=step)
     while d < range_start:
@@ -84,10 +58,6 @@ def project_occurrences(sub: Subscription, range_start: date, range_end: date) -
 
 
 def suggest_cheaper_alternative(merchant_name: str, amount: float, billing_interval: str) -> str | None:
-    """
-    Ask Claude for one concise money-saving suggestion for a recurring charge.
-    Never raises — returns None on any failure so a Claude outage can't break detection.
-    """
     if not settings.anthropic_api_key:
         return None
     try:
@@ -113,12 +83,6 @@ def suggest_cheaper_alternative(merchant_name: str, amount: float, billing_inter
 
 
 def detect_subscriptions(db: Session, user_id) -> None:
-    """
-    Group recent transactions by merchant, identify ones recurring at a consistent
-    amount and cadence, and upsert a Subscription row for each. Flags matching
-    transactions as is_subscription, and flags a price-hike anomaly when an existing
-    subscription's amount jumps by more than 5%.
-    """
     from app.models.account import Account
     from app.models.category import Category
 
@@ -135,9 +99,6 @@ def detect_subscriptions(db: Session, user_id) -> None:
             Transaction.date >= lookback_start,
             Transaction.amount > 0,
             Transaction.merchant_name.isnot(None),
-            # Savings transfers and paychecks aren't a "charge" at all — everything
-            # else (including bills like rent/loan payments) is fair game; the
-            # Subscriptions page filters further for its own "cancellable" framing.
             Category.name.notin_(NON_RECURRING_CHARGE_CATEGORIES),
         )
         .order_by(Transaction.date)
@@ -158,13 +119,8 @@ def detect_subscriptions(db: Session, user_id) -> None:
         if len(occurrences) < 2:
             continue
         amounts = [float(t.amount) for t in occurrences]
-        # A real subscription price hike has a specific shape: a tightly consistent
-        # baseline of at least 3 prior charges, then ONE newer charge that jumped.
-        # Requiring 3+ baseline points (not 2) matters: a 2-point baseline is too easy
-        # to satisfy by chance for something that's just drifting continuously (e.g. a
-        # utility bill creeping up with usage/season) rather than genuinely a stable
-        # price that changed once. Below that, fall back to requiring every amount —
-        # baseline and latest alike — to be tightly consistent together.
+        # Need a 3+ point stable baseline before treating the newest charge as a price
+        # hike rather than just amount drift (e.g. a usage-based utility bill).
         if len(amounts) >= 4:
             baseline, latest = amounts[:-1], amounts[-1]
             baseline_avg = sum(baseline) / len(baseline)
@@ -226,18 +182,12 @@ def detect_subscriptions(db: Session, user_id) -> None:
                 )
             )
 
-    # A merchant that used to recur but hasn't shown up in this window anymore —
-    # keep the row (and its cheaper-alternative history) but mark it inactive.
     for merchant, sub in existing_subs.items():
         if merchant not in seen_merchants and sub.is_active:
             sub.is_active = False
 
 
 def detect_category_anomalies(db: Session, user_id) -> None:
-    """
-    Flag recent transactions that are statistical outliers relative to the user's own
-    trailing spend in that category — e.g. a much-larger-than-usual grocery run.
-    """
     from app.models.account import Account
     from app.models.category import Category
 
@@ -285,9 +235,7 @@ def detect_category_anomalies(db: Session, user_id) -> None:
     category_names = {c.id: c.name for c in db.query(Category).all()}
 
     for t in recent_txns:
-        if t.is_anomaly:
-            continue  # already flagged (e.g. by a subscription price hike)
-        if t.category_id not in stats:
+        if t.is_anomaly or t.category_id not in stats:
             continue
         mean, stddev = stats[t.category_id]
         amount = float(t.amount)
@@ -299,7 +247,7 @@ def detect_category_anomalies(db: Session, user_id) -> None:
 
 
 def run_detection(db: Session, user_id) -> None:
-    """Run both detection passes for one user and commit. Never raises."""
+    """Run both passes for one user. Best-effort — a bad run never propagates."""
     try:
         detect_subscriptions(db, user_id)
         detect_category_anomalies(db, user_id)

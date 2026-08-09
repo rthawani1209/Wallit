@@ -1,9 +1,5 @@
-"""
-Google Places lookup for the chatbot's "find cheaper places near me" tool.
-
-Uses Places API (New) Text Search — a single free-text query (e.g. "cheap tacos
-near Austin TX") is enough, no separate geocoding step required.
-"""
+"""Google Places lookup for the chatbot's "find cheaper places near me" tool.
+Uses Places API (New) Text Search — a single free-text query is enough."""
 import logging
 
 import httpx
@@ -33,12 +29,8 @@ PRICE_LEVEL_LABELS = {
 
 
 def search_places(query: str, location: str, max_results: int = 5) -> dict:
-    """
-    Searches Google Places for `query` near `location`, sorted cheapest-first
-    (unknown price level sorts last, then by rating). Returns a dict with either
-    a `results` list or an `error` string — never raises, so the chatbot tool
-    loop always has something safe to relay to the user.
-    """
+    """Searches Google Places near `location`, sorted cheapest-first. Returns
+    a `results` list or an `error` string — never raises."""
     if not settings.google_places_api_key:
         return {"error": "Places search isn't configured on this server."}
 

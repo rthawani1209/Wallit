@@ -10,12 +10,8 @@ def save_transactions(
     category_map: dict[str, object],
     transactions: list[dict],
 ) -> int:
-    """
-    Insert new transactions and refresh categorization on existing ones (re-running a
-    sync should also repair rows that were miscategorized by an earlier, partial sync —
-    not just skip them). Never overwrites category_id on a row the user has manually
-    recategorized. Returns the number of rows touched.
-    """
+    """Insert new transactions and refresh categorization on existing ones (but
+    never overwrite a manually-recategorized row). Returns rows touched."""
     touched = 0
     for t in transactions:
         t = dict(t)

@@ -26,11 +26,8 @@ def simulate(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    What-if budget simulator: apply a hypothetical percent change to either one category's
-    spend or total spend over a date range (defaults to month-to-date), and project the
-    resulting balance.
-    """
+    """What-if simulator — apply a hypothetical % change to one category or total
+    spend and project the resulting balance."""
     accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
     account_ids = [a.id for a in accounts]
     current_balance = float(sum(a.current_balance or 0 for a in accounts))

@@ -1,19 +1,6 @@
-"""
-Transaction categorization, applied at Plaid sync time.
-
-Every transaction is guaranteed a category — required for the spend chart and
-what-if simulator to reflect real totals. Resolution order:
-  1. Plaid's own `personal_finance_category` (real bank data, high coverage,
-     ML-based — far more reliable than string-matching a merchant name)
-  2. Keyword matching on merchant name (fallback for sparse/missing Plaid data)
-  3. Claude API (for whatever's left — an unfamiliar merchant name Plaid also
-     couldn't confidently classify)
-  4. "Fees/Other" (guaranteed catch-all — a transaction is never left uncategorized,
-     reached only if Claude also can't make a confident call, or the API errors)
-
-This is a precursor to Phase 3's automated nightly job (which will also handle
-subscription and anomaly detection) — this module only covers categorization.
-"""
+"""Transaction categorization, applied at Plaid sync time. Falls through Plaid's
+own category -> keyword matching -> Claude -> a fixed catch-all, so every
+transaction ends up with a category."""
 import logging
 
 from app.config import settings
@@ -46,13 +33,10 @@ PLAID_PRIMARY_MAP: dict[str, str] = {
     "TRANSPORTATION": "Transportation",
     "TRAVEL": "Transportation",
     "RENT_AND_UTILITIES": "Housing",  # refined below via `detailed`
-    # Deliberately no "OTHER" entry: that's Plaid's own "I don't know" signal, not a
-    # confident classification — treating it as unmapped lets keyword/Claude fallback
-    # tiers take a real shot instead of dumping it straight into Fees/Other.
+    # no "OTHER" entry — that's Plaid's own unknown signal, let it fall through to keywords/Claude
 }
 
-# RENT_AND_UTILITIES covers both rent/mortgage and utility bills under one Plaid
-# primary category — split it using the detailed subcategory instead.
+# splits RENT_AND_UTILITIES between rent and actual utility bills
 UTILITIES_DETAILED = {
     "RENT_AND_UTILITIES_GAS_AND_ELECTRICITY",
     "RENT_AND_UTILITIES_INTERNET_AND_CABLE",

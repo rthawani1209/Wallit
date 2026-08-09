@@ -35,8 +35,12 @@ Thumbs.db
 .idea/
 
 # Claude Code local settings (machine-specific tool permissions)
-.claude/settings.local.json
-.claude/agent-memory/
+.claude/
+frontend/AGENTS.md
+frontend/CLAUDE.md
 
 # Alembic — keep migrations but not local state
 backend/alembic/versions/__pycache__/
+
+# Original project brief — not for public repo
+PROJECT_DESIGN.md

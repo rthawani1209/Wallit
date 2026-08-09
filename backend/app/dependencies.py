@@ -10,11 +10,8 @@ def get_current_user(
     access_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    """
-    FastAPI dependency used on every protected endpoint.
-    Reads the JWT from the httpOnly cookie, verifies it, and returns the User.
-    If the token is missing or invalid, returns 401 so the frontend redirects to login.
-    """
+    """Reads the JWT from the httpOnly cookie and returns the User, or 401s so
+    the frontend redirects to login."""
     if not access_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 

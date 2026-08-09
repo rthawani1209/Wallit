@@ -1,14 +1,7 @@
-"""
-Savings-goal (Plan) CRUD and progress computation — shared by routers/plans.py
-and the chatbot's goal tools in services/chat.py.
-
-Progress is a *pledged-pace* estimate (monthly_contribution x months elapsed
-since the goal was created), not a ledger of verified transfers — Plaid
-sandbox data has no reliable "money actually moved to savings" signal to
-track against, so this counts the user's committed monthly redirection
-instead. It's deliberately optimistic: the whole point is to show "if you
-keep this up, here's where you'll be."
-"""
+"""Savings-goal (Plan) CRUD and progress computation, shared by routers/plans.py
+and the chatbot's goal tools. Progress is a pledged-pace estimate
+(monthly_contribution x months elapsed) rather than a ledger of verified
+transfers, since there's no real "moved to savings" signal to track against."""
 import uuid
 from datetime import date, timedelta
 
@@ -18,7 +11,7 @@ from app.models.plan import Plan
 from app.models.user import User
 from app.schemas.plans import PlanResponse
 
-DAYS_PER_MONTH = 30.44  # average month length — smooths progress day-to-day instead of only ticking up at month boundaries
+DAYS_PER_MONTH = 30.44  # smooths progress day-to-day instead of only at month boundaries
 
 
 class PlanError(Exception):

@@ -1,10 +1,6 @@
-"""
-Tool-calling AI assistant. Answers general questions directly, and answers
-questions about the user's own finances (transactions, spending, subscriptions,
-bills, balances) by calling read-only tools backed by the user's real data —
-never by guessing numbers. Also exposes a Google Places lookup so the assistant
-can suggest cheaper food/entertainment options near the user.
-"""
+"""Tool-calling assistant. Answers questions about the user's own finances by
+calling read-only tools backed by real data instead of guessing, and can
+propose/apply budget and savings-goal changes once the user confirms."""
 import json
 import logging
 from datetime import date, timedelta
@@ -50,7 +46,7 @@ def _parse_date(value: str | None, default: date) -> date:
         return default
 
 
-# --- Tool implementations. Each takes (db, user, **params) and returns a JSON-able dict. ---
+# Tool implementations. Each takes (db, user, **params) and returns a JSON-able dict.
 
 
 def _tool_get_transactions(db: Session, user: User, **params) -> dict:
@@ -530,10 +526,7 @@ TOOL_DEFINITIONS = [
             },
             "required": ["query", "location"],
         },
-        # Marks the end of the (identical-on-every-call) system+tools prefix as a cache
-        # breakpoint — Anthropic caches everything up to here, so the tool loop's second+
-        # call, and every later turn in the conversation, reads this ~1k-token block from
-        # cache (~90% cheaper) instead of paying full price for it again.
+        # cache breakpoint — system+tools is identical on every call, so cache it
         "cache_control": {"type": "ephemeral"},
     },
 ]
@@ -575,11 +568,8 @@ def _system_prompt() -> str:
 
 
 def run_chat(db: Session, user: User, messages: list[dict]) -> str:
-    """
-    Runs the tool-calling loop against Claude and returns the final assistant
-    reply text. `messages` is the full conversation so far (list of
-    {"role": "user"|"assistant", "content": str}).
-    """
+    """Runs the tool-calling loop and returns the final reply text. `messages` is
+    the full conversation so far (list of {"role": ..., "content": str})."""
     if not settings.anthropic_api_key:
         return "The AI assistant isn't configured on this server (missing Anthropic API key)."
 
@@ -603,9 +593,7 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
             text = "".join(block.text for block in response.content if block.type == "text").strip()
             if text:
                 return text
-            # Claude occasionally ends a turn with only an internal "thinking" block and
-            # no visible text — nudge it to actually finish answering instead of dead-ending
-            # the conversation on what the user experiences as a dropped question.
+            # sometimes ends a turn with only a thinking block and no text — nudge it to finish
             conversation.append({"role": "assistant", "content": response.content})
             conversation.append({"role": "user", "content": "Please give your answer now."})
             continue
