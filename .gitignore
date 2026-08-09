@@ -34,7 +34,7 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 
-# Claude Code local settings (machine-specific tool permissions)
+# Local editor/agent tooling config (machine-specific)
 .claude/
 frontend/AGENTS.md
 frontend/CLAUDE.md
