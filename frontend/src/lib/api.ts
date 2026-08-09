@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// "" is intentional in production (same-domain, proxied via next.config.ts
+// rewrites) — only fall back to localhost when the var is truly unset.
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
