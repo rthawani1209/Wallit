@@ -20,9 +20,8 @@ export default function TermsPage() {
 
       <h2>Eligibility</h2>
       <p>
-        You must be old enough to legally hold or access a bank account in your jurisdiction to
-        link one through Wallit, and you must provide accurate information when creating your
-        account.
+        You must be at least 18 years old to create a Wallit account, and you must provide
+        accurate information when doing so.
       </p>
 
       <h2>Your account</h2>
@@ -81,7 +80,7 @@ export default function TermsPage() {
       <h2>Contact</h2>
       <p>
         Questions about these terms? Reach us at{" "}
-        <a href="mailto:support@example.com">support@example.com</a>.
+        <a href="mailto:thawaniroh000@gmail.com">thawaniroh000@gmail.com</a>.
       </p>
     </LegalLayout>
   );

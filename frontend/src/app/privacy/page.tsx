@@ -66,9 +66,8 @@ export default function PrivacyPage() {
 
       <h2>Children&apos;s privacy</h2>
       <p>
-        Wallit is not intended for children. Linking a real bank account is an adult financial
-        decision, and we don&apos;t knowingly collect data from anyone not old enough to hold or
-        access a bank account in their jurisdiction.
+        Wallit requires you to be at least 18 to create an account. We don&apos;t knowingly
+        collect data from anyone younger.
       </p>
 
       <h2>Changes to this policy</h2>
@@ -80,7 +79,7 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         Questions about this policy or your data? Reach us at{" "}
-        <a href="mailto:privacy@example.com">privacy@example.com</a>.
+        <a href="mailto:thawaniroh000@gmail.com">thawaniroh000@gmail.com</a>.
       </p>
     </LegalLayout>
   );

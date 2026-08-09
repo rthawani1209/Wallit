@@ -26,8 +26,8 @@ class SignupRequest(BaseModel):
         if v >= today:
             raise ValueError("date of birth must be in the past")
         age_years = (today - v).days / 365.25
-        if age_years < 13:
-            raise ValueError("must be at least 13 years old")
+        if age_years < 18:
+            raise ValueError("must be at least 18 years old")
         return v
 
 
