@@ -25,7 +25,7 @@ from app.services.places import search_places
 logger = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-5"
-MAX_TOOL_ITERATIONS = 6
+MAX_TOOL_ITERATIONS = 8
 
 
 def _user_account_ids(db: Session, user_id) -> list:
@@ -371,9 +371,15 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
             return "Sorry, I hit an error talking to the AI service. Please try again in a moment."
 
         if response.stop_reason != "tool_use":
-            return "".join(block.text for block in response.content if block.type == "text").strip() or (
-                "I didn't have a response for that — could you rephrase?"
-            )
+            text = "".join(block.text for block in response.content if block.type == "text").strip()
+            if text:
+                return text
+            # Claude occasionally ends a turn with only an internal "thinking" block and
+            # no visible text — nudge it to actually finish answering instead of dead-ending
+            # the conversation on what the user experiences as a dropped question.
+            conversation.append({"role": "assistant", "content": response.content})
+            conversation.append({"role": "user", "content": "Please give your answer now."})
+            continue
 
         conversation.append({"role": "assistant", "content": response.content})
         tool_results = []
