@@ -118,6 +118,12 @@ export default function SignupPage() {
         >
           Create account
         </Button>
+        <p className="text-xs text-center text-muted-foreground">
+          By creating an account, you agree to our{" "}
+          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+        </p>
       </form>
 
       <p className="mt-6 text-sm text-center text-muted-foreground">
