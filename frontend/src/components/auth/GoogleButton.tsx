@@ -1,7 +1,9 @@
 "use client";
 
-// "" is intentional in production (same-domain, proxied) — see lib/api.ts
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Same logic as lib/api.ts — falls back to NODE_ENV rather than always
+// defaulting to localhost, so this can't drift out of sync with a manually-set var.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
 function GoogleLogo() {
   return (

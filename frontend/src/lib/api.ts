@@ -1,6 +1,10 @@
-// "" is intentional in production (same-domain, proxied via next.config.ts
-// rewrites) — only fall back to localhost when the var is truly unset.
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Explicit NEXT_PUBLIC_API_URL always wins. If it's not set at all, use
+// Next.js's own automatic NODE_ENV (never manually configured, so it can't be
+// forgotten/left stale) rather than defaulting to localhost unconditionally —
+// a production build with no override should proxy through its own domain
+// (next.config.ts rewrites), not try to reach someone's laptop.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
