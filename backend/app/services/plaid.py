@@ -31,13 +31,20 @@ def _get_client() -> plaid_api.PlaidApi:
 def create_link_token(user_id: str) -> str:
     """Create a Plaid Link token — the frontend uses this to open the bank-connect UI."""
     client = _get_client()
-    request = LinkTokenCreateRequest(
+    kwargs = dict(
         user=LinkTokenCreateRequestUser(client_user_id=user_id),
         client_name="Wallit",
         products=[Products("transactions")],
         country_codes=[CountryCode("US")],
         language="en",
     )
+    # Real institutions (outside sandbox) commonly require Plaid's OAuth flow, which
+    # redirects the user to their bank and back — Link needs this URL up front, and
+    # it must exactly match an "Allowed redirect URI" registered in the Plaid
+    # Dashboard for this environment. Sandbox test institutions never need it.
+    if settings.plaid_env != "sandbox":
+        kwargs["redirect_uri"] = f"{settings.frontend_url}/plaid-oauth-callback"
+    request = LinkTokenCreateRequest(**kwargs)
     response = client.link_token_create(request)
     return response["link_token"]
 
