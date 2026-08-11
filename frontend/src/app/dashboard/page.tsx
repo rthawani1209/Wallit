@@ -17,6 +17,7 @@ import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
 import { AnomaliesCard } from "@/components/dashboard/AnomaliesCard";
 import { WhatIfSimulator } from "@/components/dashboard/WhatIfSimulator";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
+import { loadPlaidScript, storeLinkToken, consumeStoredLinkToken } from "@/lib/plaidLink";
 
 const today = new Date().toLocaleDateString("en-US", {
   weekday: "long",
@@ -324,29 +325,31 @@ function PlaidConnectButton({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     try {
       const { link_token } = await api.plaid.createLinkToken();
+      // Stored so the OAuth resume page can re-open Link with this same
+      // token if the bank redirects the user away and back.
+      storeLinkToken(link_token);
 
-      // Dynamically load the Plaid Link script
-      const script = document.createElement("script");
-      script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
-      script.onload = () => {
-        // @ts-expect-error Plaid is loaded dynamically
-        const handler = window.Plaid.create({
-          token: link_token,
-          onSuccess: async (public_token: string) => {
-            try {
-              await api.plaid.exchangeToken(public_token);
-              onSuccess();
-            } catch (err) {
-              console.error(err);
-              setError(err instanceof Error ? err.message : "Failed to connect bank account");
-              setLoading(false);
-            }
-          },
-          onExit: () => setLoading(false),
-        });
-        handler.open();
-      };
-      document.head.appendChild(script);
+      await loadPlaidScript();
+      // @ts-expect-error Plaid is loaded dynamically
+      const handler = window.Plaid.create({
+        token: link_token,
+        onSuccess: async (public_token: string) => {
+          try {
+            await api.plaid.exchangeToken(public_token);
+            consumeStoredLinkToken();
+            onSuccess();
+          } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : "Failed to connect bank account");
+            setLoading(false);
+          }
+        },
+        onExit: () => {
+          consumeStoredLinkToken();
+          setLoading(false);
+        },
+      });
+      handler.open();
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Failed to connect bank account");
