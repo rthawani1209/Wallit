@@ -46,7 +46,13 @@ is what gates it (a failing typecheck/build/migration blocks the deploy).
 
    | Variable | Value |
    |---|---|
-   | `NEXT_PUBLIC_API_URL` | your Railway backend URL from step 1.5 above |
+   | `BACKEND_URL` | your Railway backend URL from step 1.5 above (e.g. `https://wallit-backend-production.up.railway.app`) |
+
+   Leave `NEXT_PUBLIC_API_URL` **unset**. `next.config.ts` uses `BACKEND_URL`
+   (server-side only) to proxy `/api/*` through Vercel's own domain to Railway —
+   this is what keeps the login cookie same-site. Setting `NEXT_PUBLIC_API_URL`
+   instead would make the browser call Railway directly and bring back the
+   cross-site cookie bug (mobile Safari silently drops the cookie).
 
 4. Deploy. Vercel gives you a domain like `wallit.vercel.app`.
 
@@ -63,7 +69,21 @@ live URLs exactly like they do locally.
 
 ## 4. Going to a real bank (production Plaid)
 
-Sandbox → production is just swapping `PLAID_CLIENT_ID`/`PLAID_SECRET` for the
-production ones from your Plaid dashboard and setting `PLAID_ENV=production` —
-no code changes. Do this once you've confirmed the free-tier limits and
-Limited Production terms in the Plaid dashboard work for your plan.
+Sandbox → production is mostly swapping `PLAID_CLIENT_ID`/`PLAID_SECRET` for the
+production ones from your Plaid dashboard and setting `PLAID_ENV=production` on
+Railway. Do this once you've confirmed the free-tier limits and Limited
+Production terms in the Plaid dashboard work for your plan.
+
+One extra step outside sandbox: real banks that use Plaid's OAuth flow (Chase,
+Bank of America, Wells Fargo, etc.) redirect the user to their bank and back, so
+Plaid Link needs a registered return URL. In the
+[Plaid Dashboard](https://dashboard.plaid.com) → Team Settings → API → **Allowed
+redirect URIs**, add:
+
+```
+https://<your-vercel-domain>/plaid-oauth-callback
+```
+
+This must exactly match Railway's `FRONTEND_URL` env var plus `/plaid-oauth-callback`
+(the backend builds the redirect URI from `FRONTEND_URL`) — if they don't match
+character-for-character, Plaid rejects the OAuth resume.

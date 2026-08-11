@@ -122,7 +122,7 @@ export default function DashboardPage() {
     });
   }
 
-  function handleCategoryChange(transactionId: string, categoryId: string) {
+  function handleCategoryChange(transactionId: string, categoryId: string | null) {
     setTransactions((prev) =>
       prev.map((t) => (t.id === transactionId ? { ...t, category_id: categoryId } : t))
     );

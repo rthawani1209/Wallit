@@ -72,7 +72,7 @@ export const api = {
   transactions: {
     getAll: () => request<Transaction[]>("/api/v1/transactions"),
 
-    updateCategory: (id: string, category_id: string) =>
+    updateCategory: (id: string, category_id: string | null) =>
       request<Transaction>(`/api/v1/transactions/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ category_id }),

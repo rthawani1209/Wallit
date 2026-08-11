@@ -109,6 +109,7 @@ def _tool_get_spending_by_category(db: Session, user: User, **params) -> dict:
             Transaction.date >= start,
             Transaction.date <= end,
             Transaction.amount > 0,
+            Category.name != "Transfer",
         )
         .group_by(Category.name)
         .order_by(func.sum(Transaction.amount).desc())
@@ -346,6 +347,63 @@ def _tool_adjust_budget(db: Session, user: User, **params) -> dict:
     return progress.model_dump(mode="json")
 
 
+def _tool_dismiss_subscription(db: Session, user: User, **params) -> dict:
+    merchant_name = params.get("merchant_name")
+    if not merchant_name:
+        return {"error": "merchant_name is required"}
+
+    sub = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == user.id, Subscription.merchant_name.ilike(f"%{merchant_name}%"))
+        .first()
+    )
+    if not sub:
+        return {"error": f"No detected subscription/recurring charge matching {merchant_name!r}."}
+
+    sub.is_active = False
+    sub.dismissed_by_user = True
+    db.commit()
+    return {
+        "merchant_name": sub.merchant_name,
+        "dismissed": True,
+        "note": (
+            "This merchant will no longer be treated as a subscription or shown on the calendar, "
+            "even if it keeps recurring with a consistent amount/interval."
+        ),
+    }
+
+
+def _tool_recategorize_transactions(db: Session, user: User, **params) -> dict:
+    keyword = params.get("keyword")
+    new_category_name = params.get("new_category_name")
+    if not keyword or not new_category_name:
+        return {"error": "keyword and new_category_name are required"}
+
+    category = db.query(Category).filter(Category.name.ilike(new_category_name)).first()
+    if not category:
+        valid = ", ".join(sorted(c.name for c in db.query(Category).all()))
+        return {"error": f"No category named {new_category_name!r}. Valid categories: {valid}"}
+
+    account_ids = _user_account_ids(db, user.id)
+    txns = (
+        db.query(Transaction)
+        .filter(Transaction.account_id.in_(account_ids), Transaction.merchant_name.ilike(f"%{keyword}%"))
+        .all()
+    )
+    if not txns:
+        return {"error": f"No transactions matching {keyword!r} found."}
+
+    for t in txns:
+        t.category_id = category.id
+        t.category_is_manual = True
+    db.commit()
+    return {
+        "matched_count": len(txns),
+        "new_category": category.name,
+        "note": "Marked as a manual override, so a future bank sync won't revert these back to the auto-resolved category.",
+    }
+
+
 TOOL_HANDLERS = {
     "get_transactions": _tool_get_transactions,
     "get_spending_by_category": _tool_get_spending_by_category,
@@ -359,6 +417,8 @@ TOOL_HANDLERS = {
     "create_savings_goal": _tool_create_savings_goal,
     "update_savings_goal": _tool_update_savings_goal,
     "adjust_budget": _tool_adjust_budget,
+    "dismiss_subscription": _tool_dismiss_subscription,
+    "recategorize_transactions": _tool_recategorize_transactions,
 }
 
 TOOL_DEFINITIONS = [
@@ -510,6 +570,42 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "dismiss_subscription",
+        "description": (
+            "Permanently stop treating a merchant as a detected subscription/recurring bill — e.g. the "
+            "user says 'that's not really a subscription, I just buy from them every week' or 'remove this "
+            "from my calendar'. This is different from a normal cancellation: it just fixes a misdetection, "
+            "so the merchant will never be re-flagged as recurring again even if it keeps showing the same "
+            "amount/interval. WRITE ACTION — confirm with the user which merchant before calling this, "
+            "unless they already named it explicitly (e.g. 'remove Trader Joe's from my subscriptions')."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "merchant_name": {"type": "string", "description": "Merchant name (or partial match) as it appears in their transactions/subscriptions."},
+            },
+            "required": ["merchant_name"],
+        },
+    },
+    {
+        "name": "recategorize_transactions",
+        "description": (
+            "Bulk-fix the category of every transaction matching a merchant/keyword — use when the user "
+            "says a merchant's category is wrong (e.g. 'that Amazon charge was actually Shopping not Food' "
+            "or 'put all my Uber charges under Transportation'). Marks them as a manual override so a future "
+            "bank sync won't silently revert the fix. WRITE ACTION — describe which transactions and the new "
+            "category in a prior message and get the user's confirmation before calling this."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "keyword": {"type": "string", "description": "Case-insensitive substring match on merchant name, e.g. 'amazon', 'uber'."},
+                "new_category_name": {"type": "string", "description": "Exact category name to assign, e.g. 'Food', 'Shopping', 'Transfer'."},
+            },
+            "required": ["keyword", "new_category_name"],
+        },
+    },
+    {
         "name": "search_nearby_places",
         "description": (
             "Search Google Places for cheaper food/entertainment/errand options near a location, sorted "
@@ -550,14 +646,24 @@ def _system_prompt() -> str:
         "a balance — it already accounts for upcoming bills and savings-goal commitments.\n\n"
         "You can also set up and manage savings goals (create_savings_goal, update_savings_goal, "
         "get_savings_goals) and adjust category budget limits (adjust_budget) — e.g. helping someone free "
-        "up money each month toward a trip by trimming other categories. These four are WRITE actions with "
-        "a hard rule: when you're proposing to create a goal or change a budget/goal, describe the exact "
-        "numbers in your reply (which categories, by how much, the resulting monthly total) and ask the "
+        "up money each month toward a trip by trimming other categories. You can also fix data the app got "
+        "wrong: dismiss_subscription permanently un-flags a merchant that was wrongly detected as a "
+        "recurring subscription (e.g. a weekly grocery run at the same store), and "
+        "recategorize_transactions bulk-fixes the category for every transaction matching a merchant/"
+        "keyword. These six are WRITE actions with a hard rule, no exceptions even if the user says "
+        "something like 'just do it, no need to ask': describe exactly what you're about to change in your "
+        "reply first (which merchant, which category, which transactions matched, the effect) and ask the "
         "user to confirm — do NOT call the write tool in that same turn. Only call it after the user's next "
-        "message clearly confirms (e.g. 'yes', 'do it', 'sounds good'). get_savings_goals and "
-        "check_affordability are read-only — call those freely, no confirmation needed. When proposing "
-        "budget cuts, first call get_spending_by_category and get_subscriptions_and_bills so the categories/"
-        "amounts you suggest are grounded in what the user actually spends, not guessed.\n\n"
+        "message clearly confirms (e.g. 'yes', 'do it', 'sounds good'). This matters especially for "
+        "recategorize_transactions, since its keyword match is a substring search that can catch more "
+        "merchants than intended (e.g. 'uber' also matches 'Uber Eats') — say what actually matched before "
+        "applying it. get_savings_goals and check_affordability are read-only — call those freely, no "
+        "confirmation needed. When proposing budget cuts, first call "
+        "get_spending_by_category and get_subscriptions_and_bills so the categories/amounts you suggest are "
+        "grounded in what the user actually spends, not guessed.\n\n"
+        "Money moving between the user's own accounts (an internal transfer) is filed under the 'Transfer' "
+        "category and excluded from spending/income totals — if a large amount shows up as both a "
+        "TRANSFER_IN and TRANSFER_OUT-style charge, that's normal and not a real gain or loss.\n\n"
         "You are not a licensed financial advisor: don't give personalized investment or trading advice "
         "(which stock/crypto to buy, market timing, etc.) — if asked, say so briefly and, if relevant, stick "
         "to what you can help with (budgeting, spending, subscriptions).\n\n"

@@ -25,6 +25,10 @@ class Subscription(Base):
     # False once a detection run no longer sees this merchant recurring — kept (not
     # deleted) so the cheaper-alternative suggestion and history aren't lost.
     is_active = Column(Boolean, default=True, nullable=False)
+    # True once the user has said this recurring merchant isn't really a subscription
+    # (e.g. a weekly grocery run). Detection skips it permanently rather than
+    # re-activating it the next time the pattern matches.
+    dismissed_by_user = Column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="subscriptions")
     category = relationship("Category")

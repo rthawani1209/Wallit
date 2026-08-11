@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 interface TransactionListProps {
   transactions: Transaction[];
   categories: Category[];
-  onCategoryChange: (transactionId: string, categoryId: string) => void;
+  onCategoryChange: (transactionId: string, categoryId: string | null) => void;
 }
 
 export function TransactionList({ transactions, categories, onCategoryChange }: TransactionListProps) {
@@ -40,14 +40,13 @@ function TransactionRow({
 }: {
   transaction: Transaction;
   categories: Category[];
-  onCategoryChange: (transactionId: string, categoryId: string) => void;
+  onCategoryChange: (transactionId: string, categoryId: string | null) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const isIncome = t.amount < 0;
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const categoryId = e.target.value;
-    if (!categoryId) return;
+    const categoryId = e.target.value || null;
     setSaving(true);
     try {
       await api.transactions.updateCategory(t.id, categoryId);
@@ -82,7 +81,7 @@ function TransactionRow({
         disabled={saving}
         className="text-xs bg-transparent border border-border rounded-md px-2 py-1 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:opacity-50 shrink-0"
       >
-        <option value="" disabled>
+        <option value="" className="bg-card text-foreground">
           Uncategorized
         </option>
         {categories.map((c) => (

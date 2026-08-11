@@ -20,8 +20,8 @@ PRICE_HIKE_THRESHOLD = 1.05  # 5%
 
 # Transfers/paychecks aren't charges at all. NON_DISCRETIONARY_CATEGORIES is a
 # looser filter used by the Subscriptions page to hide bills, not by detection itself.
-NON_RECURRING_CHARGE_CATEGORIES = {"Savings", "Income"}
-NON_DISCRETIONARY_CATEGORIES = {"Debt", "Housing", "Savings", "Income"}
+NON_RECURRING_CHARGE_CATEGORIES = {"Savings", "Income", "Transfer"}
+NON_DISCRETIONARY_CATEGORIES = {"Debt", "Housing", "Savings", "Income", "Transfer"}
 
 INTERVAL_DAYS = {"weekly": 7, "monthly": 30, "quarterly": 91, "annual": 365}
 
@@ -118,6 +118,9 @@ def detect_subscriptions(db: Session, user_id) -> None:
     for merchant, occurrences in by_merchant.items():
         if len(occurrences) < 2:
             continue
+        existing = existing_subs.get(merchant)
+        if existing and existing.dismissed_by_user:
+            continue
         amounts = [float(t.amount) for t in occurrences]
         # Need a 3+ point stable baseline before treating the newest charge as a price
         # hike rather than just amount drift (e.g. a usage-based utility bill).
@@ -199,6 +202,10 @@ def detect_category_anomalies(db: Session, user_id) -> None:
     recent_start = today - timedelta(days=ANOMALY_RECENT_DAYS)
     history_start = today - timedelta(days=ANOMALY_HISTORY_DAYS)
 
+    transfer_category_id = (
+        db.query(Category.id).filter(Category.name == "Transfer").scalar()
+    )
+
     history_rows = (
         db.query(Transaction.category_id, Transaction.amount)
         .filter(
@@ -207,6 +214,7 @@ def detect_category_anomalies(db: Session, user_id) -> None:
             Transaction.date < recent_start,
             Transaction.amount > 0,
             Transaction.category_id.isnot(None),
+            Transaction.category_id != transfer_category_id,
         )
         .all()
     )

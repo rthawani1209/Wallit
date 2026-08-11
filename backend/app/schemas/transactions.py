@@ -18,7 +18,7 @@ class TransactionResponse(BaseModel):
 
 
 class TransactionUpdateRequest(BaseModel):
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None
 
 
 class CategorySpend(BaseModel):

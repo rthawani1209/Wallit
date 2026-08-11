@@ -12,14 +12,18 @@ FALLBACK_CATEGORY = "Fees/Other"
 CATEGORY_NAMES = [
     "Income", "Housing", "Utilities", "Food", "Transportation", "Subscriptions",
     "Health", "Debt", "Shopping", "Entertainment", "Savings", "Giving", "Fees/Other",
+    "Transfer",
 ]
 
 # Plaid's `personal_finance_category.primary` -> our category taxonomy.
 # See https://plaid.com/docs/api/products/transactions/#personal-finance-category
 PLAID_PRIMARY_MAP: dict[str, str] = {
     "INCOME": "Income",
-    "TRANSFER_IN": "Income",
-    "TRANSFER_OUT": "Fees/Other",
+    # Generic account-to-account movement (e.g. "Internet Transfer") — not real income
+    # or spend, so it gets its own category rather than inflating either one. The
+    # savings/investment-specific detail values are refined to "Savings" below.
+    "TRANSFER_IN": "Transfer",
+    "TRANSFER_OUT": "Transfer",
     "LOAN_PAYMENTS": "Debt",
     "BANK_FEES": "Fees/Other",
     "ENTERTAINMENT": "Entertainment",
@@ -59,6 +63,7 @@ SAVINGS_DETAILED = {
 # Keyword fallback for when Plaid's category is missing (rare) or unmapped.
 # Ordered so more specific keywords are checked before generic ones.
 CATEGORY_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("Transfer", ["internet transfer", "online transfer", "account transfer", "transfer to", "transfer from"]),
     ("Subscriptions", ["netflix", "spotify", "hulu", "disney+", "hbo", "apple music", "youtube premium"]),
     ("Food", ["restaurant", "cafe", "coffee", "starbucks", "mcdonald", "kfc", "chipotle",
               "pizza", "doordash", "grubhub", "uber eats", "burger", "whole foods",

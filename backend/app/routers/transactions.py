@@ -48,8 +48,9 @@ def update_transaction(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Manually assign a category to a transaction. Marked as a manual override so a
-    later Plaid resync never silently reverts it back to the auto-resolved category."""
+    """Manually assign a category to a transaction, or clear it back to Uncategorized by
+    passing category_id: null. Marked as a manual override so a later Plaid resync never
+    silently reverts it back to the auto-resolved category."""
     account_ids = _user_account_ids(db, current_user.id)
     transaction = (
         db.query(Transaction)
@@ -59,9 +60,10 @@ def update_transaction(
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    category = db.query(Category).filter(Category.id == body.category_id).first()
-    if not category:
-        raise HTTPException(status_code=400, detail="Invalid category")
+    if body.category_id is not None:
+        category = db.query(Category).filter(Category.id == body.category_id).first()
+        if not category:
+            raise HTTPException(status_code=400, detail="Invalid category")
 
     transaction.category_id = body.category_id
     transaction.category_is_manual = True
@@ -77,7 +79,8 @@ def get_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Spend by category for a date range (defaults to month-to-date). Only counts expenses, not income."""
+    """Spend by category for a date range (defaults to month-to-date). Only counts expenses, not income.
+    Excludes Transfer — money moved between the user's own accounts isn't spend."""
     account_ids = _user_account_ids(db, current_user.id)
     range_start = start_date or date.today().replace(day=1)
     range_end = end_date or date.today()
@@ -94,6 +97,7 @@ def get_summary(
             Transaction.date >= range_start,
             Transaction.date <= range_end,
             Transaction.amount > 0,
+            Category.name != "Transfer",
         )
         .group_by(Category.id, Category.name)
         .all()
@@ -139,7 +143,9 @@ def get_cashflow(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Income vs expenses per month, for the trailing N months (Plaid convention: amount < 0 is money in)."""
+    """Income vs expenses per month, for the trailing N months (Plaid convention: amount < 0 is money in).
+    Excludes Transfer — money moved between the user's own accounts is neither income nor expense,
+    so it doesn't make a transfer look like a gain and loss in the same month."""
     account_ids = _user_account_ids(db, current_user.id)
     range_start = _shift_months(_month_start(date.today()), -(months - 1))
 
@@ -150,7 +156,12 @@ def get_cashflow(
             func.sum(case((Transaction.amount < 0, -Transaction.amount), else_=0)).label("income"),
             func.sum(case((Transaction.amount > 0, Transaction.amount), else_=0)).label("expenses"),
         )
-        .filter(Transaction.account_id.in_(account_ids), Transaction.date >= range_start)
+        .join(Category, Transaction.category_id == Category.id, isouter=True)
+        .filter(
+            Transaction.account_id.in_(account_ids),
+            Transaction.date >= range_start,
+            (Category.name.is_(None)) | (Category.name != "Transfer"),
+        )
         .group_by(month_key)
         .all()
     )
