@@ -30,7 +30,13 @@ step "backend: import check"
 "$PYTHON" -c "import app.main"
 
 step "backend: migrations on a fresh database"
-"$PYTHON" -m alembic downgrade base >/dev/null
+"$PYTHON" - <<'PY'
+import os
+from sqlalchemy import create_engine, text
+
+with create_engine(os.environ["DATABASE_URL"]).begin() as conn:
+    conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
+PY
 "$PYTHON" -m alembic upgrade head
 
 step "backend: tests"
