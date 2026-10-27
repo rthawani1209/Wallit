@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     frontend_url: str = "http://localhost:3000"
 
+    # How many proxies sit in front of the API and append to X-Forwarded-For.
+    # The client's address is that many entries from the right; anything further
+    # left was written by the client and can't be trusted. Production is
+    # Vercel's rewrite (which sets the visitor's IP) then Railway's edge (which
+    # appends Vercel's), so 2. Local dev has no proxy: 0 uses the socket address.
+    # Unset means 2 in production and 0 elsewhere.
+    trusted_proxy_hops: int | None = None
+
     class Config:
         env_file = ".env"
 
@@ -48,6 +56,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def proxy_hops(self) -> int:
+        if self.trusted_proxy_hops is not None:
+            return self.trusted_proxy_hops
+        return 2 if self.is_production else 0
 
     @property
     def cookie_samesite(self) -> str:

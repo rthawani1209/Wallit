@@ -4,6 +4,7 @@ from collections import defaultdict, deque
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.routers.auth import _set_auth_cookie
@@ -20,10 +21,15 @@ _recent_by_ip: dict[str, deque] = defaultdict(deque)
 
 
 def _client_ip(request: Request) -> str:
-    # Behind Vercel's rewrite and Railway's proxy, the visitor is the first hop.
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """The visitor's IP as reported by our own proxies, never by the client.
+    Taking the leftmost X-Forwarded-For entry would let anyone dodge the cap
+    by sending a made-up header on every request."""
+    hops = settings.proxy_hops
+    entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+    if hops > 0 and entries:
+        # A shorter chain than expected means a proxy didn't append; the nearest
+        # entry we have is still better than the proxy's own socket address.
+        return entries[-hops] if len(entries) >= hops else entries[0]
     return request.client.host if request.client else "unknown"
 
 
@@ -55,8 +61,9 @@ def start_demo_session(
 
     if not _allow(_client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many demo sessions from this network. Try again in an hour.")
-    if demo.live_demo_count(db) >= demo.MAX_LIVE_DEMO_USERS:
-        raise HTTPException(status_code=503, detail="The demo is very busy right now. Try again in a little while.")
+    # At the global cap, make room by dropping the oldest demo accounts rather
+    # than refusing, so the demo never goes dark for the next visitor.
+    demo.evict_oldest_demo_users(db, keep=demo.MAX_LIVE_DEMO_USERS - 1)
 
     user = demo.create_demo_user(db)
     _set_auth_cookie(response, str(user.id))

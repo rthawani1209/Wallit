@@ -229,9 +229,22 @@ def is_expired(user: User) -> bool:
     return user.created_at is not None and datetime.now(timezone.utc) - user.created_at > DEMO_TTL
 
 
-def live_demo_count(db: Session) -> int:
-    cutoff = datetime.now(timezone.utc) - DEMO_TTL
-    return db.query(User).filter(User.is_demo.is_(True), User.created_at >= cutoff).count()
+def evict_oldest_demo_users(db: Session, keep: int) -> int:
+    """Delete the oldest demo users so at most `keep` remain."""
+    total = db.query(User).filter(User.is_demo.is_(True)).count()
+    if total <= keep:
+        return 0
+    oldest = (
+        db.query(User)
+        .filter(User.is_demo.is_(True))
+        .order_by(User.created_at.asc())
+        .limit(total - keep)
+        .all()
+    )
+    for user in oldest:
+        db.delete(user)
+    db.commit()
+    return len(oldest)
 
 
 def delete_expired_demo_users(db: Session) -> int:

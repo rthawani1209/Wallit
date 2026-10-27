@@ -31,6 +31,7 @@ is what gates it (a failing typecheck/build/migration blocks the deploy).
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
    | `GOOGLE_REDIRECT_URI` | `https://<your-railway-backend-domain>/api/v1/auth/google/callback` |
    | `FRONTEND_URL` | your Vercel URL — used to redirect back after Google login |
+   | `TRUSTED_PROXY_HOPS` | optional; defaults to `2` in production (Vercel rewrite + Railway edge). Used to find the visitor's real IP for the demo's per-IP limit |
 
    Also add your Railway backend's own domain as an **authorized redirect URI** in
    the Google Cloud Console OAuth client, or Google sign-in will fail.
