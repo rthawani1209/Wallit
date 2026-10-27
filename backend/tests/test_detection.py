@@ -93,3 +93,55 @@ def test_transfers_never_feed_anomaly_stats(db, user, account, categories):
     db.refresh(big)
     assert not big.is_anomaly
     assert db.query(Transaction).filter_by(account_id=account.id, is_anomaly=True).count() == 0
+
+
+def test_merchant_history_beats_category_average(db, user, account, categories):
+    # Food is mostly $4-6 coffees, but this store's weekly runs are always ~$100
+    today = date.today()
+    for days_ago in range(175, 35, -4):
+        add_txn(db, account, categories["Food"], 5, today - timedelta(days=days_ago), "Corner Coffee")
+    for days_ago, amount in zip(range(174, 35, -7), (92, 104, 88, 117, 96, 101, 110, 85, 99, 108, 94, 112, 90, 103, 97, 106, 89, 115, 100, 95)):
+        add_txn(db, account, categories["Food"], amount, today - timedelta(days=days_ago), "Trader Joe's")
+    normal_run = add_txn(db, account, categories["Food"], 114, today - timedelta(days=4), "Trader Joe's")
+    one_off = add_txn(db, account, categories["Food"], 240, today - timedelta(days=5), "Sushi Kashiba")
+
+    detection.run_detection(db, user.id)
+
+    db.refresh(normal_run)
+    db.refresh(one_off)
+    assert not normal_run.is_anomaly
+    assert one_off.is_anomaly and "Food" in one_off.anomaly_reason
+
+
+def test_spike_at_a_known_merchant_is_judged_against_that_merchant(db, user, account, categories):
+    today = date.today()
+    for days_ago, amount in zip(range(170, 40, -15), (14, 16, 15, 13, 17, 15, 14, 16, 15)):
+        add_txn(db, account, categories["Transportation"], amount, today - timedelta(days=days_ago), "Uber")
+    spike = add_txn(db, account, categories["Transportation"], 88, today - timedelta(days=3), "Uber")
+
+    detection.run_detection(db, user.id)
+
+    db.refresh(spike)
+    assert spike.is_anomaly
+    assert "usual Uber charge" in spike.anomaly_reason
+
+
+def test_irregular_gaps_are_not_a_subscription(db, user, account, categories):
+    # gaps of 10 and 50 days average out to "monthly", but no bill works like that
+    today = date.today()
+    for days_ago in (70, 60, 10):
+        add_txn(db, account, categories["Food"], 15.0, today - timedelta(days=days_ago), "Pho Bac")
+
+    detection.run_detection(db, user.id)
+
+    assert db.query(Subscription).filter_by(user_id=user.id).count() == 0
+
+
+def test_two_similar_charges_are_not_enough_for_monthly(db, user, account, categories):
+    today = date.today()
+    for days_ago in (40, 10):
+        add_txn(db, account, categories["Food"], 15.0, today - timedelta(days=days_ago), "Pho Bac")
+
+    detection.run_detection(db, user.id)
+
+    assert db.query(Subscription).filter_by(user_id=user.id).count() == 0

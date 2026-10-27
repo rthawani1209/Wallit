@@ -143,6 +143,14 @@ def detect_subscriptions(db: Session, user_id, suggest_alternatives: bool = True
         interval_label = _classify_interval(avg_interval)
         if not interval_label:
             continue
+        # Every gap has to fit the cadence, not just the average: lunch at the same
+        # place 10 and then 50 days apart averages "monthly" but isn't a bill.
+        if any(_classify_interval(gap) != interval_label for gap in intervals):
+            continue
+        # Two similar charges a month apart happen by chance all the time. Weekly
+        # and monthly need a third; quarterly/annual can't wait that long.
+        if interval_label in ("weekly", "monthly") and len(occurrences) < 3:
+            continue
 
         seen_merchants.add(merchant)
         next_due = occurrences[-1].date + timedelta(days=round(avg_interval))
@@ -195,6 +203,18 @@ def detect_subscriptions(db: Session, user_id, suggest_alternatives: bool = True
             sub.is_active = False
 
 
+def _baselines(samples: dict) -> dict:
+    """(mean, population stddev) for every key with enough history to trust."""
+    stats = {}
+    for key, amounts in samples.items():
+        if len(amounts) < MIN_HISTORY_SAMPLES:
+            continue
+        mean = sum(amounts) / len(amounts)
+        variance = sum((a - mean) ** 2 for a in amounts) / len(amounts)
+        stats[key] = (mean, variance**0.5)
+    return stats
+
+
 def detect_category_anomalies(db: Session, user_id) -> None:
     from app.models.account import Account
     from app.models.category import Category
@@ -212,7 +232,7 @@ def detect_category_anomalies(db: Session, user_id) -> None:
     )
 
     history_rows = (
-        db.query(Transaction.category_id, Transaction.amount)
+        db.query(Transaction.category_id, Transaction.merchant_name, Transaction.amount)
         .filter(
             Transaction.account_id.in_(account_ids),
             Transaction.date >= history_start,
@@ -224,16 +244,14 @@ def detect_category_anomalies(db: Session, user_id) -> None:
         .all()
     )
     by_category: dict = defaultdict(list)
-    for cat_id, amount in history_rows:
+    by_merchant: dict = defaultdict(list)
+    for cat_id, merchant, amount in history_rows:
         by_category[cat_id].append(float(amount))
+        if merchant:
+            by_merchant[merchant].append(float(amount))
 
-    stats: dict = {}
-    for cat_id, amounts in by_category.items():
-        if len(amounts) < MIN_HISTORY_SAMPLES:
-            continue
-        mean = sum(amounts) / len(amounts)
-        variance = sum((a - mean) ** 2 for a in amounts) / len(amounts)
-        stats[cat_id] = (mean, variance**0.5)
+    category_stats = _baselines(by_category)
+    merchant_stats = _baselines(by_merchant)
 
     recent_txns = (
         db.query(Transaction)
@@ -248,15 +266,24 @@ def detect_category_anomalies(db: Session, user_id) -> None:
     category_names = {c.id: c.name for c in db.query(Category).all()}
 
     for t in recent_txns:
-        if t.is_anomaly or t.category_id not in stats:
+        if t.is_anomaly:
             continue
-        mean, stddev = stats[t.category_id]
+        # A merchant with its own history is judged against itself: a $120 grocery
+        # run is normal for Trader Joe's even if most Food charges are $5 coffees.
+        # Merchants without enough history fall back to their category.
+        if t.merchant_name in merchant_stats:
+            mean, stddev = merchant_stats[t.merchant_name]
+            label = f"your usual {t.merchant_name} charge"
+        elif t.category_id in category_stats:
+            mean, stddev = category_stats[t.category_id]
+            label = f"your typical {category_names.get(t.category_id, 'this category')} spend"
+        else:
+            continue
         amount = float(t.amount)
         if amount > mean + ANOMALY_STDDEV_MULTIPLIER * stddev and amount > mean + ANOMALY_MIN_DOLLAR_GAP:
             pct = round((amount / mean - 1) * 100)
-            cat_name = category_names.get(t.category_id, "this category")
             t.is_anomaly = True
-            t.anomaly_reason = f"{pct}% higher than your typical {cat_name} spend (avg ${mean:.2f})"
+            t.anomaly_reason = f"{pct}% higher than {label} (avg ${mean:.2f})"
 
 
 def run_detection(db: Session, user_id, suggest_alternatives: bool = True) -> None:
