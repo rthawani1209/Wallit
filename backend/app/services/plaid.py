@@ -84,8 +84,12 @@ def _to_row(t) -> dict:
     }
 
 
-def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[list[dict], list[str], str]:
-    """Pull changes via Plaid's sync API. Returns (upserts, removed_ids, next_cursor).
+def sync_transactions(
+    access_token: str, cursor: str | None = None
+) -> tuple[list[dict], list[str], str, str | None]:
+    """Pull changes via Plaid's sync API. Returns (upserts, removed_ids, next_cursor,
+    update_status), where update_status is Plaid's transactions_update_status
+    (e.g. HISTORICAL_UPDATE_COMPLETE once the full history has been pulled).
 
     Upserts cover both `added` and `modified`. `removed` matters too: when a pending
     charge posts, Plaid removes the pending transaction and adds a new posted one,
@@ -94,6 +98,7 @@ def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[lis
     upserts: list[dict] = []
     removed: list[str] = []
     has_more = True
+    update_status = None
 
     while has_more:
         kwargs = {"access_token": access_token}
@@ -106,5 +111,7 @@ def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[lis
         removed.extend(r["transaction_id"] for r in response["removed"])
         cursor = response["next_cursor"]
         has_more = response["has_more"]
+        status = response.get("transactions_update_status")
+        update_status = str(status) if status is not None else None
 
-    return upserts, removed, cursor
+    return upserts, removed, cursor, update_status

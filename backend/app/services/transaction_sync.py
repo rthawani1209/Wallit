@@ -1,7 +1,15 @@
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.models.transaction import Transaction
 from app.services import categorization
+
+logger = logging.getLogger(__name__)
+
+# A full sync that returns less than this share of what we already store is
+# treated as partial, and nothing is pruned.
+MIN_PRUNE_RATIO = 0.5
 
 
 def save_transactions(
@@ -70,15 +78,27 @@ def remove_transactions(db: Session, account_ids: list, plaid_transaction_ids: l
     )
 
 
-def prune_missing_transactions(db: Session, account_ids: list, current_ids: set[str]) -> int:
-    """After a full sync, drop the user's rows that Plaid no longer returns."""
-    if not account_ids or not current_ids:
+def prune_missing_transactions(
+    db: Session, account_ids: list, current_ids: set[str], history_complete: bool
+) -> int:
+    """After a full sync, drop the user's rows that Plaid no longer returns.
+
+    Deleting is the one step here that can't be undone, so it only runs when Plaid
+    says the history pull is complete, and it backs off if the fetch looks short
+    (fewer than half the rows we already hold), since a partial fetch would
+    otherwise wipe real history along with any manual category edits."""
+    if not history_complete or not account_ids or not current_ids:
         return 0
-    return (
-        db.query(Transaction)
-        .filter(
-            Transaction.account_id.in_(account_ids),
-            Transaction.plaid_transaction_id.notin_(current_ids),
-        )
-        .delete(synchronize_session=False)
+    stale = db.query(Transaction).filter(
+        Transaction.account_id.in_(account_ids),
+        Transaction.plaid_transaction_id.notin_(current_ids),
     )
+    held = db.query(Transaction).filter(Transaction.account_id.in_(account_ids)).count()
+    if len(current_ids) < held * MIN_PRUNE_RATIO:
+        logger.warning(
+            "Skipping prune: sync returned %d transactions but %d are stored for these accounts",
+            len(current_ids),
+            held,
+        )
+        return 0
+    return stale.delete(synchronize_session=False)

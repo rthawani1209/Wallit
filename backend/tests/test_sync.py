@@ -71,8 +71,42 @@ def test_full_sync_prunes_stale_rows_only_on_synced_accounts(db, user, account, 
     save_transactions(db, account_map, categories, [other_row])
     db.flush()
 
-    pruned = prune_missing_transactions(db, [account.id], {"keep"})
+    pruned = prune_missing_transactions(db, [account.id], {"keep"}, history_complete=True)
 
     remaining = {t.plaid_transaction_id for t in db.query(Transaction).filter(Transaction.account_id.in_([account.id, other.id]))}
     assert pruned == 1
     assert remaining == {"keep", "other-bank-txn"}
+
+
+def _seed_history(db, account, categories, n):
+    account_map = {account.plaid_account_id: account.id}
+    save_transactions(db, account_map, categories, [row(f"h{i}", account) for i in range(n)])
+    db.flush()
+
+
+def test_no_prune_while_history_is_still_loading(db, account, categories):
+    _seed_history(db, account, categories, 10)
+
+    pruned = prune_missing_transactions(db, [account.id], {"h0", "h1"}, history_complete=False)
+
+    assert pruned == 0
+    assert db.query(Transaction).filter_by(account_id=account.id).count() == 10
+
+
+def test_short_fetch_leaves_existing_rows_alone(db, account, categories):
+    _seed_history(db, account, categories, 10)
+
+    # Plaid says complete, but only 4 of the 10 rows we hold came back: looks partial
+    pruned = prune_missing_transactions(db, [account.id], {f"h{i}" for i in range(4)}, history_complete=True)
+
+    assert pruned == 0
+    assert db.query(Transaction).filter_by(account_id=account.id).count() == 10
+
+
+def test_complete_fetch_prunes_only_the_stale_rows(db, account, categories):
+    _seed_history(db, account, categories, 10)
+
+    pruned = prune_missing_transactions(db, [account.id], {f"h{i}" for i in range(9)}, history_complete=True)
+
+    assert pruned == 1
+    assert db.query(Transaction).filter_by(account_id=account.id).count() == 9
