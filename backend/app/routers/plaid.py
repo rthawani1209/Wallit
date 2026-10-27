@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import require_real_user
 from app.models.account import Account
 from app.models.category import Category
 from app.models.user import User
@@ -58,7 +58,7 @@ def _sync_into_db(db: Session, user: User, access_token: str) -> int:
 
 
 @router.post("/link-token", response_model=LinkTokenResponse)
-def create_link_token(current_user: User = Depends(get_current_user)):
+def create_link_token(current_user: User = Depends(require_real_user)):
     """Short-lived token the frontend passes to Plaid's Link widget."""
     try:
         token = plaid_service.create_link_token(str(current_user.id))
@@ -70,7 +70,7 @@ def create_link_token(current_user: User = Depends(get_current_user)):
 @router.post("/exchange-token")
 def exchange_token(
     body: ExchangeTokenRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_real_user),
     db: Session = Depends(get_db),
 ):
     """Exchange the public token from Plaid Link for a permanent access token,
@@ -99,7 +99,7 @@ def exchange_token(
 
 
 @router.post("/resync")
-def resync(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def resync(current_user: User = Depends(require_real_user), db: Session = Depends(get_db)):
     """Re-fetch full transaction history and refresh categorization on every row."""
     if not current_user.plaid_access_token:
         raise HTTPException(status_code=400, detail="No bank account connected")

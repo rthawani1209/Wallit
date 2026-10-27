@@ -11,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.database import SessionLocal
 from app.models.user import User
-from app.services import detection
+from app.services import demo, detection
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,8 @@ def run_nightly_detection() -> None:
         logger.info("Nightly detection: running for %d user(s)", len(users))
         for user in users:
             detection.run_detection(db, user.id)
+        removed = demo.delete_expired_demo_users(db)
+        logger.info("Nightly cleanup: removed %d expired demo user(s)", removed)
     finally:
         db.close()
 

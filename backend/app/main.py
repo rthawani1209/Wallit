@@ -10,6 +10,7 @@ from app.routers import (
     budgets,
     categories,
     chat,
+    demo,
     plaid,
     plans,
     simulate,
@@ -48,6 +49,7 @@ app.include_router(budgets.router, prefix="/api/v1")
 app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(plans.router, prefix="/api/v1")
+app.include_router(demo.router, prefix="/api/v1")
 
 
 @app.get("/health")
