@@ -73,11 +73,26 @@ def get_accounts(access_token: str) -> list[dict]:
     ]
 
 
-def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[list[dict], str]:
-    """Pull new/changed transactions via Plaid's sync API. Returns the transactions
-    and the new cursor to store for next time."""
+def _to_row(t) -> dict:
+    return {
+        "plaid_transaction_id": t["transaction_id"],
+        "amount": float(t["amount"]),
+        "merchant_name": t.get("merchant_name") or t.get("name"),
+        "date": t["date"],
+        "plaid_account_id": t["account_id"],
+        "personal_finance_category": t.get("personal_finance_category"),
+    }
+
+
+def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[list[dict], list[str], str]:
+    """Pull changes via Plaid's sync API. Returns (upserts, removed_ids, next_cursor).
+
+    Upserts cover both `added` and `modified`. `removed` matters too: when a pending
+    charge posts, Plaid removes the pending transaction and adds a new posted one,
+    so ignoring removals double-counts every card purchase."""
     client = _get_client()
-    all_added = []
+    upserts: list[dict] = []
+    removed: list[str] = []
     has_more = True
 
     while has_more:
@@ -86,19 +101,10 @@ def sync_transactions(access_token: str, cursor: str | None = None) -> tuple[lis
             kwargs["cursor"] = cursor
         request = TransactionsSyncRequest(**kwargs)
         response = client.transactions_sync(request)
-        all_added.extend(response["added"])
+        upserts.extend(_to_row(t) for t in response["added"])
+        upserts.extend(_to_row(t) for t in response["modified"])
+        removed.extend(r["transaction_id"] for r in response["removed"])
         cursor = response["next_cursor"]
         has_more = response["has_more"]
 
-    transactions = [
-        {
-            "plaid_transaction_id": t["transaction_id"],
-            "amount": float(t["amount"]),
-            "merchant_name": t.get("merchant_name") or t.get("name"),
-            "date": t["date"],
-            "plaid_account_id": t["account_id"],
-            "personal_finance_category": t.get("personal_finance_category"),
-        }
-        for t in all_added
-    ]
-    return transactions, cursor
+    return upserts, removed, cursor

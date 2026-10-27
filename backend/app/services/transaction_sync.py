@@ -34,6 +34,11 @@ def save_transactions(
         if existing:
             if not existing.category_is_manual:
                 existing.category_id = category_id
+            # Plaid reports edits (e.g. a tip added when a restaurant charge posts)
+            # through `modified`, so the row has to take the new values.
+            existing.amount = t["amount"]
+            existing.date = t["date"]
+            existing.merchant_name = t.get("merchant_name")
             existing.plaid_category_primary = plaid_primary
             existing.plaid_category_detailed = plaid_detailed
         else:
@@ -48,3 +53,32 @@ def save_transactions(
             )
         touched += 1
     return touched
+
+
+def remove_transactions(db: Session, account_ids: list, plaid_transaction_ids: list[str]) -> int:
+    """Delete rows Plaid says no longer exist (mostly pending charges that posted
+    under a new id). Scoped to the user's own accounts."""
+    if not plaid_transaction_ids or not account_ids:
+        return 0
+    return (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id.in_(account_ids),
+            Transaction.plaid_transaction_id.in_(plaid_transaction_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+
+
+def prune_missing_transactions(db: Session, account_ids: list, current_ids: set[str]) -> int:
+    """After a full sync, drop the user's rows that Plaid no longer returns."""
+    if not account_ids or not current_ids:
+        return 0
+    return (
+        db.query(Transaction)
+        .filter(
+            Transaction.account_id.in_(account_ids),
+            Transaction.plaid_transaction_id.notin_(current_ids),
+        )
+        .delete(synchronize_session=False)
+    )
