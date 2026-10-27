@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.database import get_db
 from app.main import app
 from app.models.account import Account
@@ -108,12 +109,65 @@ def test_demo_chat_is_capped(db):
         app.dependency_overrides.clear()
 
 
-def test_new_demo_sessions_are_rate_limited_per_ip(db):
+def test_new_demo_sessions_are_rate_limited_per_ip():
+    demo_router._recent_by_ip.clear()
+    for _ in range(demo_router.SESSIONS_PER_IP_PER_HOUR):
+        assert demo_router._allow("203.0.113.9")
+    assert not demo_router._allow("203.0.113.9")
+    assert demo_router._allow("198.51.100.4")
+
+
+def test_spoofed_forwarded_for_does_not_reset_the_cap(db, monkeypatch):
+    # Behind two proxies the real visitor is second from the right; a fake
+    # leftmost entry from the client must not count as a new visitor.
+    monkeypatch.setattr(settings, "trusted_proxy_hops", 2)
     client = _client(db)
     try:
-        for _ in range(demo_router.SESSIONS_PER_IP_PER_HOUR):
-            assert demo_router._allow("203.0.113.9")
-        assert not demo_router._allow("203.0.113.9")
-        assert demo_router._allow("198.51.100.4")
+        for i in range(demo_router.SESSIONS_PER_IP_PER_HOUR):
+            client.cookies.clear()
+            headers = {"x-forwarded-for": f"10.0.0.{i}, 198.51.100.7, 76.76.21.1"}
+            assert client.post("/api/v1/demo/session", headers=headers).status_code == 200
+        client.cookies.clear()
+        spoofed = {"x-forwarded-for": "1.2.3.4, 198.51.100.7, 76.76.21.1"}
+        assert client.post("/api/v1/demo/session", headers=spoofed).status_code == 429
     finally:
         app.dependency_overrides.clear()
+
+
+def test_global_cap_evicts_the_oldest_instead_of_refusing(db, monkeypatch):
+    monkeypatch.setattr(demo, "MAX_LIVE_DEMO_USERS", 2)
+    first = demo.create_demo_user(db)
+    first.created_at = datetime.now(timezone.utc) - timedelta(hours=3)
+    db.commit()
+    demo.create_demo_user(db)
+    client = _client(db)
+    try:
+        assert client.post("/api/v1/demo/session").status_code == 200
+        assert db.query(User).filter_by(id=first.id).first() is None
+        assert db.query(User).filter(User.is_demo.is_(True)).count() == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_creating_a_demo_makes_no_claude_calls(db, monkeypatch):
+    # With a key configured, any fallthrough in categorization or detection would
+    # reach Anthropic. Record every client construction and require none.
+    import anthropic
+
+    calls = []
+
+    def record(*args, **kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("Claude must not be called while building a demo")
+
+    monkeypatch.setattr(settings, "anthropic_api_key", "sk-test-not-real")
+    monkeypatch.setattr(anthropic, "Anthropic", record)
+
+    demo.create_demo_user(db)
+    assert calls == []
+
+    # and the trap does fire on a real fallthrough, so the check above means something
+    from app.services.categorization import resolve_category
+
+    resolve_category("ZZQX Holdings LLC", None, 12.0)
+    assert len(calls) == 1
