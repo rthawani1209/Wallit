@@ -122,11 +122,19 @@ export function CalendarGrid({
               >
                 {day.getDate()}
               </span>
-              <div className="mt-1 space-y-0.5 overflow-hidden flex-1">
+              {/* Phones get dots (a 48px cell can't fit a merchant name); tap the day for details. */}
+              {dayEvents.length > 0 && (
+                <div className="sm:hidden mt-auto flex items-center gap-0.5" aria-label={`${dayEvents.length} charges`}>
+                  {dayEvents.slice(0, 3).map((_, i) => (
+                    <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(16,217,140,0.7)]" />
+                  ))}
+                </div>
+              )}
+              <div className="hidden sm:block mt-1 space-y-0.5 overflow-hidden flex-1">
                 {dayEvents.slice(0, 2).map((e, i) => (
                   <div
                     key={i}
-                    className="text-[9px] sm:text-[10px] leading-tight rounded px-1 py-0.5 truncate bg-primary/10 text-primary font-medium"
+                    className="text-[10px] leading-tight rounded px-1 py-0.5 truncate bg-primary/10 text-primary font-medium"
                   >
                     {e.merchant_name} {fmt(e.amount)}
                   </div>
