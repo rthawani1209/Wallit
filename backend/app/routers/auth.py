@@ -14,6 +14,9 @@ from app.services.auth import create_access_token, create_oauth_state, hash_pass
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Compared against when there's no real hash, to keep login timing uniform.
+DUMMY_HASH = hash_password("not-a-real-password")
+
 
 def _set_auth_cookie(response: Response, user_id: str) -> None:
     token = create_access_token(user_id)
@@ -52,7 +55,10 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
 @router.post("/login", response_model=UserResponse)
 def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(func.lower(User.email) == body.email.lower()).first()
-    if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+    # Always run one bcrypt check, even with no user or no password set, so the
+    # response time doesn't reveal which emails have accounts.
+    password_ok = verify_password(body.password, user.password_hash if user and user.password_hash else DUMMY_HASH)
+    if not user or not user.password_hash or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     _set_auth_cookie(response, str(user.id))
