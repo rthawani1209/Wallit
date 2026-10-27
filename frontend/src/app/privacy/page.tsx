@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <LegalLayout title="Privacy Policy" updated="August 9, 2026">
       <p>
-        Wallit ("we," "our," or "us") helps you track and understand your personal finances by
+        Wallit (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;) helps you track and understand your personal finances by
         connecting to your bank accounts. This policy explains what information we collect, why,
         and how it&apos;s handled. It applies to everyone who creates a Wallit account.
       </p>

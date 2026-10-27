@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import type { BudgetProgress as BudgetProgressItem } from "@/lib/api";
 
 function fmt(val: number) {

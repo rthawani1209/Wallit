@@ -58,7 +58,7 @@ export default function TermsPage() {
 
       <h2>Disclaimer &amp; limitation of liability</h2>
       <p>
-        Wallit is provided "as is," without warranties of any kind. We do our best to keep your
+        Wallit is provided &ldquo;as is,&rdquo; without warranties of any kind. We do our best to keep your
         data accurate and the service running, but we&apos;re not liable for financial decisions
         made based on information in the app, or for losses resulting from service interruptions,
         inaccuracies, or unauthorized access to your account resulting from your own failure to
