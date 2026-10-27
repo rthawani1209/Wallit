@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.account import Account
+from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.transactions import SimulateResponse
@@ -42,6 +43,11 @@ def simulate(
     ]
     if category_id is not None:
         base_filters.append(Transaction.category_id == category_id)
+    else:
+        # Transfers between the user's own accounts aren't spend, so cutting "total
+        # spend" by 20% shouldn't pretend 20% of a savings transfer disappears.
+        transfer_id = db.query(Category.id).filter(Category.name == "Transfer").scalar()
+        base_filters.append(Transaction.category_id.is_distinct_from(transfer_id))
 
     actual_spend = float(
         db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(*base_filters).scalar()

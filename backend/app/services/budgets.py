@@ -44,6 +44,9 @@ def get_budget_progress(db: Session, user: User) -> list[BudgetProgress]:
     today = date.today()
     month_start = _month_start(today)
     history_start = _shift_months(month_start, -3)
+    # Money moved between the user's own accounts isn't spend, same as the summary
+    # and cash-flow endpoints, so it never gets a budget row.
+    transfer_id = db.query(Category.id).filter(Category.name == "Transfer").scalar()
 
     current_spend = dict(
         db.query(Transaction.category_id, func.sum(Transaction.amount))
@@ -52,6 +55,7 @@ def get_budget_progress(db: Session, user: User) -> list[BudgetProgress]:
             Transaction.date >= month_start,
             Transaction.date <= today,
             Transaction.amount > 0,
+            Transaction.category_id.is_distinct_from(transfer_id),
         )
         .group_by(Transaction.category_id)
         .all()
@@ -74,6 +78,7 @@ def get_budget_progress(db: Session, user: User) -> list[BudgetProgress]:
             Transaction.date >= history_start,
             Transaction.date < month_start,
             Transaction.amount > 0,
+            Transaction.category_id.is_distinct_from(transfer_id),
         )
         .group_by(Transaction.category_id)
         .all()
