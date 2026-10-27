@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Date, String, DateTime, Text
+from sqlalchemy import Boolean, Column, Date, String, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -22,6 +22,10 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # Plaid access token stored encrypted — never log this field
     plaid_access_token = Column(Text, nullable=True)
+    # Throwaway account from the recruiter demo, seeded with sample data and
+    # deleted after a day. See services/demo.py.
+    is_demo = Column(Boolean, default=False, nullable=False)
+    demo_chat_count = Column(Integer, default=0, nullable=False)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     plans = relationship("Plan", back_populates="user", cascade="all, delete-orphan")
