@@ -82,7 +82,7 @@ def suggest_cheaper_alternative(merchant_name: str, amount: float, billing_inter
         return None
 
 
-def detect_subscriptions(db: Session, user_id) -> None:
+def detect_subscriptions(db: Session, user_id, suggest_alternatives: bool = True) -> None:
     from app.models.account import Account
     from app.models.category import Category
 
@@ -168,9 +168,10 @@ def detect_subscriptions(db: Session, user_id) -> None:
                 latest_txn.anomaly_reason = (
                     f"{merchant} price increased from ${old_amount:.2f} to ${latest_amount:.2f}"
                 )
-                sub.cheaper_alternative = suggest_cheaper_alternative(
-                    merchant, latest_amount, interval_label
-                )
+                if suggest_alternatives:
+                    sub.cheaper_alternative = suggest_cheaper_alternative(
+                        merchant, latest_amount, interval_label
+                    )
         else:
             db.add(
                 Subscription(
@@ -181,7 +182,11 @@ def detect_subscriptions(db: Session, user_id) -> None:
                     next_estimated_date=next_due,
                     category_id=latest_category_id,
                     is_active=True,
-                    cheaper_alternative=suggest_cheaper_alternative(merchant, latest_amount, interval_label),
+                    cheaper_alternative=(
+                        suggest_cheaper_alternative(merchant, latest_amount, interval_label)
+                        if suggest_alternatives
+                        else None
+                    ),
                 )
             )
 
@@ -254,10 +259,12 @@ def detect_category_anomalies(db: Session, user_id) -> None:
             t.anomaly_reason = f"{pct}% higher than your typical {cat_name} spend (avg ${mean:.2f})"
 
 
-def run_detection(db: Session, user_id) -> None:
-    """Run both passes for one user. Best-effort — a bad run never propagates."""
+def run_detection(db: Session, user_id, suggest_alternatives: bool = True) -> None:
+    """Run both passes for one user. Best-effort — a bad run never propagates.
+    suggest_alternatives=False skips the per-subscription Claude call (the demo
+    seeds its own tips rather than paying for them on every visit)."""
     try:
-        detect_subscriptions(db, user_id)
+        detect_subscriptions(db, user_id, suggest_alternatives)
         detect_category_anomalies(db, user_id)
         db.commit()
     except Exception:
