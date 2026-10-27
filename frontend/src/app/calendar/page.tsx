@@ -52,7 +52,6 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    setSelectedDate(null);
     api.subscriptions
       .getCalendar(monthKey(monthStart))
       .then((data) => {
@@ -63,6 +62,11 @@ export default function CalendarPage() {
       cancelled = true;
     };
   }, [user, monthStart]);
+
+  function shiftMonth(delta: number) {
+    setSelectedDate(null);
+    setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+  }
 
   async function handleLogout() {
     await api.auth.logout();
@@ -176,12 +180,8 @@ export default function CalendarPage() {
                 events={events}
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
-                onPrevMonth={() =>
-                  setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
-                }
-                onNextMonth={() =>
-                  setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
-                }
+                onPrevMonth={() => shiftMonth(-1)}
+                onNextMonth={() => shiftMonth(1)}
               />
             </div>
 

@@ -25,7 +25,7 @@ export default function NotFound() {
         <p className="text-sm font-mono text-muted-foreground mb-2">404</p>
         <h1 className="text-2xl font-semibold tracking-tight mb-2">Page not found</h1>
         <p className="text-sm text-muted-foreground mb-8 max-w-sm">
-          That page doesn't exist, or it moved. Let's get you back to your finances.
+          That page doesn&apos;t exist, or it moved. Let&apos;s get you back to your finances.
         </p>
         <Link href="/dashboard">
           <Button className="gap-2">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, LayoutDashboard, LogOut, RefreshCw, Repeat, Sparkles, Wallet } from "lucide-react";
 import type { Account } from "@/lib/api";
+import { isDemoEmail } from "@/lib/demo";
 
 interface SidebarProps {
   userEmail: string;
@@ -52,6 +53,8 @@ export function Sidebar({
   lastSyncedLabel,
 }: SidebarProps) {
   const pathname = usePathname();
+  const isDemo = isDemoEmail(userEmail);
+  const displayName = isDemo ? "Alex Rivera (demo)" : userEmail;
 
   return (
     <>
@@ -63,7 +66,7 @@ export function Sidebar({
         />
       )}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border transition-transform duration-200 md:translate-x-0 relative overflow-hidden ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-border transition-transform duration-200 md:translate-x-0 overflow-hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -142,7 +145,25 @@ export function Sidebar({
           </div>
         )}
 
-        {accounts.length > 0 && (
+        {isDemo && (
+          <div className="mt-6 mx-3 rounded-xl border border-primary/20 bg-primary/[0.06] p-3.5">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
+              Demo sandbox
+            </span>
+            <p className="text-xs text-muted-foreground mt-1 mb-3 leading-relaxed">
+              Generated sample data, analyzed by the real app. Resets after 24 hours.
+            </p>
+            <Link
+              href="/signup"
+              onClick={onClose}
+              className="w-full flex items-center justify-center rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Use your own data
+            </Link>
+          </div>
+        )}
+
+        {accounts.length > 0 && !isDemo && (
           <div className="mt-6 mx-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -176,11 +197,11 @@ export function Sidebar({
       <div className="relative px-3 py-3 border-t border-border">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-md">
           <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-[11px] font-bold text-primary-foreground flex-shrink-0 shadow-[0_0_14px_rgba(16,217,140,0.5)]">
-            {initials(userEmail)}
+            {isDemo ? "AR" : initials(userEmail)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium truncate text-sidebar-foreground">
-              {userEmail}
+              {displayName}
             </div>
           </div>
           <button

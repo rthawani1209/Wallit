@@ -5,7 +5,7 @@ money is going, and lets you ask it questions in plain English.
 
 Next.js · FastAPI · PostgreSQL · Plaid · Claude API · Docker
 
-**[Live demo](https://wallit-xi.vercel.app)** · **[Deployment notes](DEPLOYMENT.md)**
+**[Try the live demo — no account needed](https://wallit-xi.vercel.app/demo)** · **[Live app](https://wallit-xi.vercel.app)** · **[Deployment notes](DEPLOYMENT.md)** · **[Claims and proof](docs/CLAIMS.md)**
 
 
 <img width="1437" height="892" alt="image" src="https://github.com/user-attachments/assets/9e479ced-13d2-4705-ab34-40fd108d48e2" />
@@ -47,6 +47,12 @@ near Capitol Hill." It can also change things: adjust a budget, create a savings
 recategorize a merchant, or dismiss a bad subscription detection.
 
 **Auth** — email/password or Google OAuth, JWT in an httpOnly cookie.
+
+**Demo mode** — `/demo` signs a visitor into a private sandbox with eight months of generated bank
+history (paychecks, rent, subscriptions, a Netflix price hike, a couple of splurges). The data is
+fake but nothing downstream is: it goes through the same categorization and detection code as a real
+Plaid sync, so every chart and flag is computed, not hard-coded. Demo accounts can't connect a bank,
+get a capped number of assistant messages, and are deleted after 24 hours.
 
 ## Running it
 
@@ -92,15 +98,18 @@ Next.js (Vercel)  ──/api/* proxy──▶  FastAPI (Railway)  ──▶  Pos
 ```
 
 ```
-backend/
-├── routers/     HTTP layer, thin
-├── services/    the actual logic — plaid, categorization, detection, chat, budgets, plans
-├── models/      SQLAlchemy
-└── alembic/     12 migrations
-frontend/src/
-├── app/         routes
-├── components/  dashboard cards, calendar grid, chat, ui primitives
-└── lib/         typed API client
+backend/             FastAPI API
+├── app/routers/     HTTP layer, thin
+├── app/services/    the actual logic — plaid, categorization, detection, chat, budgets, plans, demo
+├── app/models/      SQLAlchemy
+├── alembic/         13 migrations
+└── tests/           pytest, runs against a real Postgres
+frontend/src/        Next.js app
+├── app/             routes (dashboard, calendar, subscriptions, assistant, demo, auth)
+├── components/      dashboard cards, calendar grid, chat, demo banner, ui primitives
+└── lib/             typed API client
+scripts/check.sh     runs everything CI runs; use it before pushing
+docs/CLAIMS.md       every claim with its proof and a command to reproduce it
 ```
 
 Routers stay thin on purpose. Everything real lives in `services/`, which is what let the
@@ -138,8 +147,10 @@ a $10 fluctuation in a utility bill became a "price increase." It now requires a
 `dismissed_by_user` flag means "this isn't a subscription" is permanent — detection skips
 that merchant on every future run instead of re-adding it.
 
-**Anomaly detection is mean + 2σ with a floor.** Per category, over 180 days of history,
-minimum 4 samples. The extra condition is a $20 absolute gap, because two standard deviations
+**Anomaly detection is mean + 2σ with a floor.** Over 180 days of history, minimum 4 samples.
+A merchant with enough history is judged against itself first, because a $120 grocery run is
+normal for Trader Joe's even when most Food charges are $5 coffees; merchants without history fall
+back to their category. The extra condition is a $20 absolute gap, because two standard deviations
 above a $3 average coffee is $8, and nobody needs an alert about that. Each flag carries a
 readable reason like `62% higher than your typical Food spend (avg $41.20)`.
 
@@ -196,9 +207,8 @@ at `/docs` when the backend is running.
 
 ## What's not done
 
-- **No test suite.** CI catches import errors and migration breakage, but the detection and
-  categorization logic is pure functions with clear inputs and outputs and it should have real
-  unit tests. This is the next thing I'd add.
+- **One bank per user.** Linking a second bank replaces the first one's access token. A
+  `plaid_items` table with a cursor per bank is next.
 - **Still on Plaid sandbox.** Going to production is mostly swapping keys, plus registering
   the OAuth redirect URI for banks like Chase that use it. `DEPLOYMENT.md` covers it.
 - **Savings goal progress is pledged, not verified.** It tracks contribution × months elapsed

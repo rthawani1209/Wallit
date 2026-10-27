@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -12,6 +13,9 @@ from app.services import google_oauth
 from app.services.auth import create_access_token, create_oauth_state, hash_password, verify_oauth_state, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Compared against when there's no real hash, to keep login timing uniform.
+DUMMY_HASH = hash_password("not-a-real-password")
 
 
 def _set_auth_cookie(response: Response, user_id: str) -> None:
@@ -28,11 +32,12 @@ def _set_auth_cookie(response: Response, user_id: str) -> None:
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == body.email).first():
+    email = body.email.lower()
+    if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        email=body.email,
+        email=email,
         password_hash=hash_password(body.password),
         first_name=body.first_name,
         last_name=body.last_name,
@@ -49,8 +54,11 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
 
 @router.post("/login", response_model=UserResponse)
 def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == body.email).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    user = db.query(User).filter(func.lower(User.email) == body.email.lower()).first()
+    # Always run one bcrypt check, even with no user or no password set, so the
+    # response time doesn't reveal which emails have accounts.
+    password_ok = verify_password(body.password, user.password_hash if user and user.password_hash else DUMMY_HASH)
+    if not user or not user.password_hash or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     _set_auth_cookie(response, str(user.id))
@@ -59,7 +67,13 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie("access_token")
+    # Same flags the cookie was set with, or some browsers keep the original.
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        samesite=settings.cookie_samesite,
+        secure=settings.is_production,
+    )
     return {"message": "Logged out"}
 
 
@@ -89,7 +103,11 @@ def google_callback(code: str, state: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=502, detail=f"Google sign-in failed: {e}")
 
     google_id = profile["sub"]
-    email = profile["email"]
+    email = profile["email"].lower()
+    if not profile.get("email_verified"):
+        # Linking below trusts the email to match an existing account, which is
+        # only safe when Google has verified the address.
+        raise HTTPException(status_code=400, detail="Your Google email address isn't verified")
 
     identity = (
         db.query(LinkedIdentity)
@@ -102,7 +120,7 @@ def google_callback(code: str, state: str, db: Session = Depends(get_db)):
     else:
         # Google vouches for verified emails, so it's safe to attach this Google
         # identity to an existing password-based account with the same address.
-        user = db.query(User).filter(User.email == email).first()
+        user = db.query(User).filter(func.lower(User.email) == email).first()
         if not user:
             user = User(
                 email=email,

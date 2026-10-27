@@ -72,6 +72,19 @@ export default function LoginPage() {
         </Button>
       </form>
 
+      <Link
+        href="/demo"
+        className="mt-4 group flex items-center justify-between rounded-lg border border-primary/25 bg-primary/[0.06] px-4 py-3 transition-colors hover:bg-primary/[0.1]"
+      >
+        <span>
+          <span className="block text-sm font-medium text-foreground">Explore the live demo</span>
+          <span className="block text-xs text-muted-foreground">No account needed. Sample data, real analysis.</span>
+        </span>
+        <span className="text-primary transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+          →
+        </span>
+      </Link>
+
       <p className="mt-6 text-sm text-center text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="text-primary hover:underline">

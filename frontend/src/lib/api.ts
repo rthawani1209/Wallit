@@ -49,6 +49,10 @@ export const api = {
     me: () => request<User>("/api/v1/auth/me"),
   },
 
+  demo: {
+    start: () => request<User>("/api/v1/demo/session", { method: "POST" }),
+  },
+
   plaid: {
     createLinkToken: () =>
       request<{ link_token: string }>("/api/v1/plaid/link-token", { method: "POST" }),
@@ -154,6 +158,7 @@ export interface User {
   email: string;
   first_name: string | null;
   last_name: string | null;
+  is_demo: boolean;
 }
 
 export interface Account {

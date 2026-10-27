@@ -687,7 +687,9 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
             response = client.messages.create(
                 model=MODEL,
                 max_tokens=1024,
-                system=[{"type": "text", "text": _system_prompt()}],
+                # Breakpoint here covers tools + system (tools render first). The
+                # prompt only changes when the date does, so it stays warm all day.
+                system=[{"type": "text", "text": _system_prompt(), "cache_control": {"type": "ephemeral"}}],
                 tools=TOOL_DEFINITIONS,
                 messages=conversation,
             )

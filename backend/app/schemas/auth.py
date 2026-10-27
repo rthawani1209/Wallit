@@ -41,6 +41,7 @@ class UserResponse(BaseModel):
     email: str
     first_name: str | None
     last_name: str | None
+    is_demo: bool = False
 
     class Config:
         from_attributes = True
