@@ -79,3 +79,19 @@ def test_chat_is_limited_per_user(db, monkeypatch):
         assert [client.post("/api/v1/chat", json=body).status_code for _ in range(4)] == [200, 200, 200, 429]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_limiter_drops_idle_keys(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("app.services.rate_limit.time.monotonic", lambda: clock[0])
+    limiter = SlidingWindowLimiter(limit=5, window_seconds=60)
+
+    for i in range(10_000):
+        limiter.allow(f"203.0.113.9|user{i}@example.com")
+    assert len(limiter) == 10_000
+
+    clock[0] += 61
+    for _ in range(rate_limit.SWEEP_EVERY):
+        limiter.allow("still-active")
+    assert len(limiter) == 1
+
