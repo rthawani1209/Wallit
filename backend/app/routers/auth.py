@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -10,6 +10,8 @@ from app.models.linked_identity import LinkedIdentity
 from app.models.user import User
 from app.schemas.auth import LoginRequest, SignupRequest, UserResponse
 from app.services import google_oauth
+from app.services.client_ip import client_ip
+from app.services.rate_limit import login_email_limiter, login_ip_limiter, login_limiter, signup_limiter
 from app.services.auth import create_access_token, create_oauth_state, hash_password, verify_oauth_state, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -31,7 +33,9 @@ def _set_auth_cookie(response: Response, user_id: str) -> None:
 
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db)):
+def signup(body: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    if not signup_limiter.allow(client_ip(request)):
+        raise HTTPException(status_code=429, detail="Too many sign-ups from this network. Try again later.")
     email = body.email.lower()
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -53,8 +57,18 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
 
 
 @router.post("/login", response_model=UserResponse)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    user = db.query(User).filter(func.lower(User.email) == body.email.lower()).first()
+def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    # The tight limit is per IP + email, so one person mistyping doesn't lock out
+    # a shared network. The looser per-IP and per-email limits catch a script
+    # spraying many accounts or many IPs guessing one account.
+    ip, email = client_ip(request), body.email.lower()
+    if not (
+        login_ip_limiter.allow(ip)
+        and login_limiter.allow(f"{ip}|{email}")
+        and login_email_limiter.allow(email)
+    ):
+        raise HTTPException(status_code=429, detail="Too many login attempts. Wait a few minutes and try again.")
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     # Always run one bcrypt check, even with no user or no password set, so the
     # response time doesn't reveal which emails have accounts.
     password_ok = verify_password(body.password, user.password_hash if user and user.password_hash else DUMMY_HASH)

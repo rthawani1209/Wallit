@@ -11,8 +11,7 @@ from app.models.plan import Plan
 from app.models.subscription import Subscription
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.routers import demo as demo_router
-from app.services import demo
+from app.services import demo, rate_limit
 
 
 def test_seed_is_realistic_and_runs_through_real_detection(db):
@@ -64,7 +63,7 @@ def test_expired_demo_users_are_deleted_with_their_data(db):
 
 def _client(db):
     app.dependency_overrides[get_db] = lambda: db
-    demo_router._recent_by_ip.clear()
+    rate_limit.reset_all()
     return TestClient(app)
 
 
@@ -110,11 +109,11 @@ def test_demo_chat_is_capped(db):
 
 
 def test_new_demo_sessions_are_rate_limited_per_ip():
-    demo_router._recent_by_ip.clear()
-    for _ in range(demo_router.SESSIONS_PER_IP_PER_HOUR):
-        assert demo_router._allow("203.0.113.9")
-    assert not demo_router._allow("203.0.113.9")
-    assert demo_router._allow("198.51.100.4")
+    rate_limit.reset_all()
+    for _ in range(rate_limit.demo_limiter.limit):
+        assert rate_limit.demo_limiter.allow("203.0.113.9")
+    assert not rate_limit.demo_limiter.allow("203.0.113.9")
+    assert rate_limit.demo_limiter.allow("198.51.100.4")
 
 
 def test_spoofed_forwarded_for_does_not_reset_the_cap(db, monkeypatch):
@@ -123,7 +122,7 @@ def test_spoofed_forwarded_for_does_not_reset_the_cap(db, monkeypatch):
     monkeypatch.setattr(settings, "trusted_proxy_hops", 2)
     client = _client(db)
     try:
-        for i in range(demo_router.SESSIONS_PER_IP_PER_HOUR):
+        for i in range(rate_limit.demo_limiter.limit):
             client.cookies.clear()
             headers = {"x-forwarded-for": f"10.0.0.{i}, 198.51.100.7, 76.76.21.1"}
             assert client.post("/api/v1/demo/session", headers=headers).status_code == 200
