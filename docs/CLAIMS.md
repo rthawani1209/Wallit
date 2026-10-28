@@ -21,6 +21,9 @@ Every command runs from `backend/` against a throwaway Postgres (see `scripts/ch
 | Login, signup and the assistant are rate limited (logins: 10 per 15 min per IP and email, 50 per 15 min per IP, 20 per hour per email; 5 signups per hour per IP, 40 assistant messages per hour per user), and the limiter drops idle keys so it can't grow without bound | `backend/tests/test_rate_limit.py` | `pytest tests/test_rate_limit.py` |
 | CI blocks deploys: lint, typecheck, build, import check, migrations on a fresh database, and the test suite | `.github/workflows/ci.yml`, `scripts/check.sh` | `scripts/check.sh` |
 
+## Known tradeoffs
+- The per-email login limit (20 an hour across all IPs) means someone who knows your email can block password login for up to an hour. Google sign-in still works, and the alternative is letting a botnet guess one account without limit.
+
 ## Not claimable yet
 - Assistant tool use and prompt caching work against the live API, but there's no automated test that calls Claude. An eval with recorded cache-hit numbers is on the plan.
 - Performance numbers (sync time, demo creation time) need a committed benchmark results file before they're quoted.
