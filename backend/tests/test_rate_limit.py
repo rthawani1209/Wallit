@@ -95,3 +95,36 @@ def test_limiter_drops_idle_keys(monkeypatch):
         limiter.allow("still-active")
     assert len(limiter) == 1
 
+
+def _login(client, email, ip):
+    return client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "wrong-guess"},
+        headers={"X-Forwarded-For": ip},
+    )
+
+
+def test_one_ip_spraying_many_accounts_is_limited(db, monkeypatch):
+    monkeypatch.setattr("app.services.client_ip.settings.trusted_proxy_hops", 1)
+    client = _client(db)
+    try:
+        codes = [_login(client, f"victim{i}@example.com", "198.51.100.7").status_code
+                 for i in range(rate_limit.login_ip_limiter.limit + 1)]
+        assert codes[:-1] == [401] * rate_limit.login_ip_limiter.limit
+        assert codes[-1] == 429
+        # another network is unaffected
+        assert _login(client, "victim0@example.com", "198.51.100.8").status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_many_ips_guessing_one_account_is_limited(db, user, monkeypatch):
+    monkeypatch.setattr("app.services.client_ip.settings.trusted_proxy_hops", 1)
+    client = _client(db)
+    try:
+        limit = rate_limit.login_email_limiter.limit
+        codes = [_login(client, user.email, f"192.0.2.{i}").status_code for i in range(limit + 1)]
+        assert codes[:-1] == [401] * limit
+        assert codes[-1] == 429
+    finally:
+        app.dependency_overrides.clear()

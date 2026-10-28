@@ -18,7 +18,7 @@ Every command runs from `backend/` against a throwaway Postgres (see `scripts/ch
 | Stale rows are pruned only after a complete, full-size sync, so a partial fetch never deletes real history | `test_sync.py` (still loading, short fetch, complete fetch) | `pytest tests/test_sync.py -k prune` |
 | Recruiter demo: one click creates a private sandbox with 8 months of generated bank history, analyzed by the real pipeline, and deleted after 24 hours | `test_demo.py` (seed, categorization path, session reuse, cleanup) and the `/demo` page | `pytest tests/test_demo.py`, then open `/demo` |
 | The demo can't touch Plaid, caps assistant messages and rate-limits new sessions per IP | `test_demo.py::test_demo_users_cannot_touch_plaid`, `::test_demo_chat_is_capped`, `::test_new_demo_sessions_are_rate_limited_per_ip` | `pytest tests/test_demo.py -k "plaid or capped or rate"` |
-| Login, signup and the assistant are rate limited (10 logins per 15 min per IP and email, 5 signups per hour per IP, 40 assistant messages per hour per user) | `backend/tests/test_rate_limit.py` | `pytest tests/test_rate_limit.py` |
+| Login, signup and the assistant are rate limited (logins: 10 per 15 min per IP and email, 50 per 15 min per IP, 20 per hour per email; 5 signups per hour per IP, 40 assistant messages per hour per user), and the limiter drops idle keys so it can't grow without bound | `backend/tests/test_rate_limit.py` | `pytest tests/test_rate_limit.py` |
 | CI blocks deploys: lint, typecheck, build, import check, migrations on a fresh database, and the test suite | `.github/workflows/ci.yml`, `scripts/check.sh` | `scripts/check.sh` |
 
 ## Not claimable yet
