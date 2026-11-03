@@ -8,6 +8,10 @@ users.plaid_access_token held a single token, so linking a second bank
 overwrote the first and its accounts stopped syncing. Each linked bank now
 gets its own row with its own token and /transactions/sync cursor. Existing
 tokens are copied over and the user's accounts are attached to them.
+
+users.plaid_access_token is left in place for now: the old container keeps
+serving while this migration runs on deploy, and its User model still maps
+that column. A later migration drops it once this release is confirmed.
 """
 from typing import Sequence, Union
 
@@ -53,22 +57,11 @@ def upgrade() -> None:
         FROM plaid_items WHERE plaid_items.user_id = accounts.user_id
         """
     )
-    op.drop_column("users", "plaid_access_token")
 
 
 def downgrade() -> None:
-    op.add_column("users", sa.Column("plaid_access_token", sa.Text(), nullable=True))
-    # Only one token fits back in the old column; keep the oldest bank's.
-    op.execute(
-        """
-        UPDATE users SET plaid_access_token = first.access_token
-        FROM (
-            SELECT DISTINCT ON (user_id) user_id, access_token
-            FROM plaid_items ORDER BY user_id, created_at
-        ) AS first
-        WHERE first.user_id = users.id
-        """
-    )
+    # users.plaid_access_token was never dropped, so the old code picks up
+    # where it left off. Banks linked since the upgrade aren't carried back.
     op.drop_index("ix_accounts_plaid_item_id", table_name="accounts")
     op.drop_column("accounts", "plaid_item_id")
     op.drop_index("ix_plaid_items_user_id", table_name="plaid_items")
