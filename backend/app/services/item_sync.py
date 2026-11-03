@@ -39,9 +39,32 @@ def _pull(access_token: str, cursor: str | None) -> tuple[list[dict], list[str],
     return list(latest.values()), list(removed_set), cursor_out, status == HISTORY_COMPLETE
 
 
+def _backfill_item_id(db: Session, item: PlaidItem, access_token: str) -> bool:
+    """Banks linked before plaid_items existed have no item_id, so re-linking
+    them couldn't find their row. Look it up once. Returns False if the user has
+    since re-linked the same login under a new row, in which case this one is a
+    stale duplicate and is deleted (its accounts fall back to the newer row on
+    that row's next sync)."""
+    item_id = plaid_service.get_item_id(access_token)
+    duplicate = (
+        db.query(PlaidItem)
+        .filter(PlaidItem.item_id == item_id, PlaidItem.id != item.id)
+        .first()
+    )
+    if duplicate is not None:
+        db.query(Account).filter(Account.plaid_item_id == item.id).update({Account.plaid_item_id: duplicate.id})
+        db.delete(item)
+        db.commit()
+        return False
+    item.item_id = item_id
+    return True
+
+
 def sync_item(db: Session, item: PlaidItem) -> int:
     """Apply this bank's changes since its last sync. Returns rows touched."""
     access_token = encryption.decrypt(item.access_token)
+    if item.item_id is None and not _backfill_item_id(db, item, access_token):
+        return 0
     accounts = db.query(Account).filter(Account.plaid_item_id == item.id).all()
     account_map = {a.plaid_account_id: a.id for a in accounts}
     category_map = {c.name: c.id for c in db.query(Category).all()}

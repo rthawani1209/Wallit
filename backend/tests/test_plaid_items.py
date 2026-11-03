@@ -131,3 +131,41 @@ def test_relinking_the_same_bank_reuses_its_item(client, db, user, fake_plaid):
 
 def test_resync_without_a_bank_is_rejected(client):
     assert client.post("/api/v1/plaid/resync").status_code == 400
+
+
+def test_legacy_bank_gets_its_item_id_and_relink_reuses_it(client, db, user, fake_plaid, monkeypatch):
+    # a bank linked before plaid_items existed: migrated row, no item_id
+    fake_plaid.add_bank("tok-chase", "item-chase", ["chase-chk"], ([txn("c1", "chase-chk")], []))
+    monkeypatch.setattr("app.services.plaid.get_item_id", lambda token: fake_plaid.banks[token]["item_id"])
+    legacy = PlaidItem(user_id=user.id, item_id=None, access_token=encryption.encrypt("tok-chase"))
+    db.add(legacy)
+    db.flush()
+    db.add(Account(user_id=user.id, plaid_item_id=legacy.id, plaid_account_id="chase-chk", name="Chk", type="depository"))
+    db.flush()
+
+    assert client.post("/api/v1/plaid/resync").status_code == 200
+    db.refresh(legacy)
+    assert legacy.item_id == "item-chase"
+
+    link(client, "tok-chase", "Chase")
+    items = db.query(PlaidItem).filter_by(user_id=user.id).all()
+    assert [i.id for i in items] == [legacy.id]
+    assert items[0].institution_name == "Chase"
+
+
+def test_legacy_duplicate_of_a_relinked_bank_is_dropped(db, user, fake_plaid, monkeypatch):
+    # the user re-linked before the backfill ran, so the same login has two rows
+    fake_plaid.add_bank("tok-chase", "item-chase", ["chase-chk"], ([txn("c1", "chase-chk")], []))
+    monkeypatch.setattr("app.services.plaid.get_item_id", lambda token: fake_plaid.banks[token]["item_id"])
+    fresh = PlaidItem(user_id=user.id, item_id="item-chase", access_token=encryption.encrypt("tok-chase"))
+    legacy = PlaidItem(user_id=user.id, item_id=None, access_token=encryption.encrypt("tok-chase"))
+    db.add_all([fresh, legacy])
+    db.flush()
+    acct = Account(user_id=user.id, plaid_item_id=legacy.id, plaid_account_id="chase-chk", name="Chk", type="depository")
+    db.add(acct)
+    db.flush()
+
+    assert item_sync.sync_item(db, legacy) == 0
+    assert db.query(PlaidItem).filter_by(user_id=user.id).all() == [fresh]
+    db.refresh(acct)
+    assert acct.plaid_item_id == fresh.id

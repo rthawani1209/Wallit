@@ -5,6 +5,7 @@ from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUse
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.accounts_get_request import AccountsGetRequest
+from plaid.model.item_get_request import ItemGetRequest
 from plaid.model.products import Products
 from plaid.model.country_code import CountryCode
 
@@ -56,6 +57,13 @@ def exchange_public_token(public_token: str) -> tuple[str, str]:
     request = ItemPublicTokenExchangeRequest(public_token=public_token)
     response = client.item_public_token_exchange(request)
     return response["access_token"], response["item_id"]
+
+
+def get_item_id(access_token: str) -> str:
+    """Plaid's id for the item behind this token."""
+    client = _get_client()
+    response = client.item_get(ItemGetRequest(access_token=access_token))
+    return response["item"]["item_id"]
 
 
 def get_accounts(access_token: str) -> list[dict]:
