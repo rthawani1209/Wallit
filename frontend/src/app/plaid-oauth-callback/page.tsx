@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, PlaidLinkMetadata } from "@/lib/api";
 import { loadPlaidScript, consumeStoredLinkToken } from "@/lib/plaidLink";
 
 // Real banks that require Plaid's OAuth flow send the user here after they
@@ -30,9 +30,9 @@ export default function PlaidOAuthCallbackPage() {
         const handler = window.Plaid.create({
           token: linkToken,
           receivedRedirectUri: window.location.href,
-          onSuccess: async (public_token: string) => {
+          onSuccess: async (public_token: string, metadata?: PlaidLinkMetadata) => {
             try {
-              await api.plaid.exchangeToken(public_token);
+              await api.plaid.exchangeToken(public_token, metadata?.institution?.name);
             } catch (err) {
               console.error(err);
             } finally {

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Boolean, Column, Date, String, DateTime, Integer, Text
+from sqlalchemy import Boolean, Column, Date, String, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -20,8 +20,9 @@ class User(Base):
     last_name = Column(String, nullable=True)
     date_of_birth = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    # Plaid access token stored encrypted — never log this field
-    plaid_access_token = Column(Text, nullable=True)
+    # The users.plaid_access_token column is superseded by plaid_items (migration
+    # 0014) and left unmapped until a later migration drops it.
+
     # Throwaway account from the recruiter demo, seeded with sample data and
     # deleted after a day. See services/demo.py.
     is_demo = Column(Boolean, default=False, nullable=False)
@@ -33,3 +34,4 @@ class User(Base):
     linked_identities = relationship("LinkedIdentity", back_populates="user", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
+    plaid_items = relationship("PlaidItem", back_populates="user", cascade="all, delete-orphan")

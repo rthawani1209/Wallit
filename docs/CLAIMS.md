@@ -15,10 +15,15 @@ Every command runs from `backend/` against a throwaway Postgres (see `scripts/ch
 | Unusual-spending alerts use mean + 2σ against the merchant's own history first, then the category's, with a $20 floor | `test_detection.py` (merchant beats category, spike at a known merchant, small-gap coffee not flagged) | `pytest tests/test_detection.py -k "anomaly or merchant"` |
 | A user's manual category survives a bank resync | `test_sync.py::test_manual_category_survives_resync` | `pytest tests/test_sync.py -k manual` |
 | Plaid sync applies added, modified and removed transactions, so a pending charge that posts isn't counted twice | `test_sync.py` (modified amount, pending removed) | `pytest tests/test_sync.py` |
+| Several banks can be linked per user, each with its own token, and resyncs are incremental: only changes since Plaid's saved cursor are fetched | `backend/tests/test_plaid_items.py` (second bank keeps the first, resync sends the saved cursor, pending→posted applied, relink reuses the item) | `pytest tests/test_plaid_items.py` |
 | Stale rows are pruned only after a complete, full-size sync, so a partial fetch never deletes real history | `test_sync.py` (still loading, short fetch, complete fetch) | `pytest tests/test_sync.py -k prune` |
 | Recruiter demo: one click creates a private sandbox with 8 months of generated bank history, analyzed by the real pipeline, and deleted after 24 hours | `test_demo.py` (seed, categorization path, session reuse, cleanup) and the `/demo` page | `pytest tests/test_demo.py`, then open `/demo` |
 | The demo can't touch Plaid, caps assistant messages and rate-limits new sessions per IP | `test_demo.py::test_demo_users_cannot_touch_plaid`, `::test_demo_chat_is_capped`, `::test_new_demo_sessions_are_rate_limited_per_ip` | `pytest tests/test_demo.py -k "plaid or capped or rate"` |
+| Login, signup and the assistant are rate limited (logins: 10 per 15 min per IP and email, 50 per 15 min per IP, 20 per hour per email; 5 signups per hour per IP, 40 assistant messages per hour per user), and the limiter drops idle keys so it can't grow without bound | `backend/tests/test_rate_limit.py` | `pytest tests/test_rate_limit.py` |
 | CI blocks deploys: lint, typecheck, build, import check, migrations on a fresh database, and the test suite | `.github/workflows/ci.yml`, `scripts/check.sh` | `scripts/check.sh` |
+
+## Known tradeoffs
+- The per-email login limit (20 an hour across all IPs) means someone who knows your email can block password login for up to an hour. Google sign-in still works, and the alternative is letting a botnet guess one account without limit.
 
 ## Not claimable yet
 - Assistant tool use and prompt caching work against the live API, but there's no automated test that calls Claude. An eval with recorded cache-hit numbers is on the plan.

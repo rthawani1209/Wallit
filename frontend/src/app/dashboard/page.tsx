@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, Wallet } from "lucide-react";
-import { api, Account, Anomaly, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Plan, Transaction, UpcomingBill } from "@/lib/api";
+import { api, Account, Anomaly, BudgetProgress as BudgetProgressData, CashFlowMonth, Category, CategorySpend, Plan, PlaidLinkMetadata, Transaction, UpcomingBill } from "@/lib/api";
 import { getDateRange, periodLabel as formatPeriodLabel, Period } from "@/lib/dateRange";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -333,9 +333,9 @@ function PlaidConnectButton({ onSuccess }: { onSuccess: () => void }) {
       // @ts-expect-error Plaid is loaded dynamically
       const handler = window.Plaid.create({
         token: link_token,
-        onSuccess: async (public_token: string) => {
+        onSuccess: async (public_token: string, metadata?: PlaidLinkMetadata) => {
           try {
-            await api.plaid.exchangeToken(public_token);
+            await api.plaid.exchangeToken(public_token, metadata?.institution?.name);
             consumeStoredLinkToken();
             onSuccess();
           } catch (err) {

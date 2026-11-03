@@ -1,60 +1,17 @@
-import time
-
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import require_real_user
 from app.models.account import Account
-from app.models.category import Category
+from app.models.plaid_item import PlaidItem
 from app.models.user import User
-from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse
+from app.schemas.plaid import ExchangeTokenRequest, LinkTokenResponse, PlaidItemResponse
 from app.services import detection, encryption, plaid as plaid_service
-from app.services.transaction_sync import prune_missing_transactions, remove_transactions, save_transactions
+from app.services.item_sync import sync_item
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
-
-
-def _fetch_all_transactions(access_token: str) -> tuple[list[dict], list[str], bool]:
-    """Full history for this token as (upserts, removed_ids, history_complete),
-    deduplicated so a transaction that was added and then modified or removed
-    shows up once. history_complete is True only when Plaid says the item has
-    finished pulling its full history."""
-    # Right after linking, Plaid may still be enriching the item's history, so an
-    # empty poll doesn't mean it's done — poll a few extra times before giving up.
-    upserts, removed, cursor, status = plaid_service.sync_transactions(access_token)
-    for _ in range(5):
-        time.sleep(2)
-        more, more_removed, cursor, status = plaid_service.sync_transactions(access_token, cursor)
-        upserts.extend(more)
-        removed.extend(more_removed)
-
-    removed_set = set(removed)
-    latest = {t["plaid_transaction_id"]: t for t in upserts if t["plaid_transaction_id"] not in removed_set}
-    return list(latest.values()), list(removed_set), status == "HISTORICAL_UPDATE_COMPLETE"
-
-
-def _sync_into_db(db: Session, user: User, access_token: str) -> int:
-    db_accounts = db.query(Account).filter(Account.user_id == user.id).all()
-    account_map = {a.plaid_account_id: a.id for a in db_accounts}
-    category_map = {c.name: c.id for c in db.query(Category).all()}
-
-    upserts, removed, history_complete = _fetch_all_transactions(access_token)
-    touched = save_transactions(db, account_map, category_map, upserts)
-    db.flush()
-    touched += remove_transactions(db, list(account_map.values()), removed)
-
-    # Each sync starts from an empty cursor, so once Plaid reports the history pull
-    # complete, `upserts` is this bank's full current history and any other row we
-    # hold for its accounts is stale (usually a pending charge saved before removals
-    # were handled). Only accounts this token returned are pruned, so a different
-    # bank's rows are never touched; prune_missing_transactions has its own guards.
-    synced_accounts = {account_map[t["plaid_account_id"]] for t in upserts if t["plaid_account_id"] in account_map}
-    touched += prune_missing_transactions(
-        db, list(synced_accounts), {t["plaid_transaction_id"] for t in upserts}, history_complete
-    )
-    db.commit()
-    return touched
 
 
 @router.post("/link-token", response_model=LinkTokenResponse)
@@ -74,38 +31,74 @@ def exchange_token(
     db: Session = Depends(get_db),
 ):
     """Exchange the public token from Plaid Link for a permanent access token,
-    then pull accounts and transactions for this user."""
+    then pull this bank's accounts and transactions. Each bank gets its own
+    item, so linking a second one leaves the first alone."""
     try:
-        access_token = plaid_service.exchange_public_token(body.public_token)
+        access_token, item_id = plaid_service.exchange_public_token(body.public_token)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Plaid exchange error: {str(e)}")
 
-    current_user.plaid_access_token = encryption.encrypt(access_token)
-    db.commit()
+    # Re-linking the same login (e.g. after a password change) replaces its token
+    # and starts its sync over.
+    item = db.query(PlaidItem).filter(PlaidItem.item_id == item_id, PlaidItem.user_id == current_user.id).first()
+    if item is None:
+        item = PlaidItem(user_id=current_user.id, item_id=item_id)
+        db.add(item)
+    item.access_token = encryption.encrypt(access_token)
+    item.institution_name = body.institution_name or item.institution_name
+    item.cursor = None
+    db.flush()
 
-    accounts_data = plaid_service.get_accounts(access_token)
-    for a in accounts_data:
-        existing = db.query(Account).filter(Account.plaid_account_id == a["plaid_account_id"]).first()
+    for a in plaid_service.get_accounts(access_token):
+        existing = (
+            db.query(Account)
+            .filter(Account.plaid_account_id == a["plaid_account_id"], Account.user_id == current_user.id)
+            .first()
+        )
         if existing:
             existing.current_balance = a["current_balance"]
+            existing.plaid_item_id = item.id
         else:
-            db.add(Account(user_id=current_user.id, **a))
+            db.add(Account(user_id=current_user.id, plaid_item_id=item.id, **a))
     db.commit()
 
-    _sync_into_db(db, current_user, access_token)
+    sync_item(db, item)
     detection.run_detection(db, current_user.id)
 
     return {"message": "Bank connected and transactions synced"}
 
 
+@router.get("/items", response_model=list[PlaidItemResponse])
+def list_items(current_user: User = Depends(require_real_user), db: Session = Depends(get_db)):
+    """The banks this user has linked."""
+    rows = (
+        db.query(PlaidItem, func.count(Account.id))
+        .outerjoin(Account, Account.plaid_item_id == PlaidItem.id)
+        .filter(PlaidItem.user_id == current_user.id)
+        .group_by(PlaidItem.id)
+        .order_by(PlaidItem.created_at)
+        .all()
+    )
+    return [
+        PlaidItemResponse(
+            id=item.id,
+            institution_name=item.institution_name,
+            account_count=count,
+            last_synced_at=item.last_synced_at,
+        )
+        for item, count in rows
+    ]
+
+
 @router.post("/resync")
 def resync(current_user: User = Depends(require_real_user), db: Session = Depends(get_db)):
-    """Re-fetch full transaction history and refresh categorization on every row."""
-    if not current_user.plaid_access_token:
+    """Pull what changed at every linked bank since the last sync, then refresh
+    subscriptions and alerts."""
+    items = db.query(PlaidItem).filter(PlaidItem.user_id == current_user.id).all()
+    if not items:
         raise HTTPException(status_code=400, detail="No bank account connected")
-    access_token = encryption.decrypt(current_user.plaid_access_token)
 
-    touched = _sync_into_db(db, current_user, access_token)
+    touched = sum(sync_item(db, item) for item in items)
     detection.run_detection(db, current_user.id)
 
     return {"message": "Resynced", "transactions_touched": touched}

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat import run_chat
 from app.services.demo import DEMO_CHAT_LIMIT
+from app.services.rate_limit import chat_limiter
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -23,6 +24,9 @@ def post_chat(
         raise HTTPException(status_code=422, detail="messages must not be empty")
     if body.messages[-1].role != "user":
         raise HTTPException(status_code=422, detail="Last message must be from the user")
+
+    if not chat_limiter.allow(str(current_user.id)):
+        raise HTTPException(status_code=429, detail="You've sent a lot of messages this hour. Give it a little while.")
 
     if current_user.is_demo:
         if current_user.demo_chat_count >= DEMO_CHAT_LIMIT:

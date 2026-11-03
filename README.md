@@ -94,7 +94,7 @@ Next.js (Vercel)  ──/api/* proxy──▶  FastAPI (Railway)  ──▶  Pos
                                             ├──▶ Claude API     categorization, chat, suggestions
                                             └──▶ Google Places  nearby search
                                             
-                                     APScheduler re-runs detection nightly
+                                     APScheduler syncs every bank and re-runs detection nightly
 ```
 
 ```
@@ -196,7 +196,7 @@ at `/docs` when the backend is running.
 | | |
 |---|---|
 | `auth` | `signup`, `login`, `logout`, `me`, `google/start`, `google/callback` |
-| `plaid` | `link-token`, `exchange-token`, `resync` |
+| `plaid` | `link-token`, `exchange-token`, `items`, `resync` |
 | `transactions` | list, `PATCH` category, `summary`, `cashflow`, `upcoming-bills`, `anomalies` |
 | `subscriptions` | list, `calendar` |
 | `budgets` | `progress`, `PUT /{category_id}` |
@@ -207,13 +207,15 @@ at `/docs` when the backend is running.
 
 ## What's not done
 
-- **One bank per user.** Linking a second bank replaces the first one's access token. A
-  `plaid_items` table with a cursor per bank is next.
+- **No UI for multiple banks yet.** The backend keeps each linked bank separately
+  (`plaid_items`, with its own token and sync cursor) and `GET /plaid/items` lists them, but
+  the dashboard doesn't show the list or let you unlink one. That lands with the redesign.
+- **No Plaid webhooks.** New transactions arrive on resync or the nightly sync, not live.
 - **Still on Plaid sandbox.** Going to production is mostly swapping keys, plus registering
   the OAuth redirect URI for banks like Chase that use it. `DEPLOYMENT.md` covers it.
 - **Savings goal progress is pledged, not verified.** It tracks contribution × months elapsed
   rather than reconciling against actual transfers.
-- **Detection runs nightly on a single process.** Fine at this size. Real multi-user load
+- **Sync and detection run nightly on a single process.** Fine at this size. Real multi-user load
   wants a proper task queue, which is what Redis is sitting there for.
 - **`frontend/README.md` is still create-next-app boilerplate.**
 
