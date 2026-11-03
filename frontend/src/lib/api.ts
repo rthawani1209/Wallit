@@ -57,11 +57,13 @@ export const api = {
     createLinkToken: () =>
       request<{ link_token: string }>("/api/v1/plaid/link-token", { method: "POST" }),
 
-    exchangeToken: (public_token: string) =>
+    exchangeToken: (public_token: string, institution_name?: string) =>
       request<{ message: string }>("/api/v1/plaid/exchange-token", {
         method: "POST",
-        body: JSON.stringify({ public_token }),
+        body: JSON.stringify({ public_token, institution_name }),
       }),
+
+    items: () => request<PlaidItem[]>("/api/v1/plaid/items"),
 
     resync: () =>
       request<{ message: string; transactions_touched: number }>("/api/v1/plaid/resync", {
@@ -152,6 +154,18 @@ export const api = {
     return request<SimulateResult>(`/api/v1/simulate?${params.toString()}`);
   },
 };
+
+// The part of Plaid Link's onSuccess metadata we use.
+export interface PlaidLinkMetadata {
+  institution?: { name?: string } | null;
+}
+
+export interface PlaidItem {
+  id: string;
+  institution_name: string | null;
+  account_count: number;
+  last_synced_at: string | null;
+}
 
 export interface User {
   id: string;
