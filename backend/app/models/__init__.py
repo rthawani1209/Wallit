@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.linked_identity import LinkedIdentity
 from app.models.account import Account
+from app.models.plaid_item import PlaidItem
 from app.models.transaction import Transaction
 from app.models.category import Category
 from app.models.plan import Plan, PlanLineItem

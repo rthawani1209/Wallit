@@ -49,12 +49,13 @@ def create_link_token(user_id: str) -> str:
     return response["link_token"]
 
 
-def exchange_public_token(public_token: str) -> str:
-    """Exchange the short-lived public token from Plaid Link for a permanent access token."""
+def exchange_public_token(public_token: str) -> tuple[str, str]:
+    """Exchange the short-lived public token from Plaid Link for a permanent
+    access token. Returns (access_token, item_id)."""
     client = _get_client()
     request = ItemPublicTokenExchangeRequest(public_token=public_token)
     response = client.item_public_token_exchange(request)
-    return response["access_token"]
+    return response["access_token"], response["item_id"]
 
 
 def get_accounts(access_token: str) -> list[dict]:
