@@ -11,6 +11,7 @@ from app.routers import (
     categories,
     chat,
     demo,
+    forecast,
     plaid,
     plans,
     simulate,
@@ -45,6 +46,7 @@ app.include_router(accounts.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(categories.router, prefix="/api/v1")
 app.include_router(simulate.router, prefix="/api/v1")
+app.include_router(forecast.router, prefix="/api/v1")
 app.include_router(budgets.router, prefix="/api/v1")
 app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
