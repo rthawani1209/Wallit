@@ -144,6 +144,8 @@ export const api = {
       }),
   },
 
+  forecast: (days = 30) => request<Forecast>(`/api/v1/forecast?days=${days}`),
+
   simulate: (percentChange: number, categoryId?: string, range?: DateRange) => {
     const params = new URLSearchParams({ percent_change: String(percentChange) });
     if (categoryId) params.set("category_id", categoryId);
@@ -165,6 +167,21 @@ export interface PlaidItem {
   institution_name: string | null;
   account_count: number;
   last_synced_at: string | null;
+}
+
+export interface ForecastDay {
+  date: string;
+  balance: number;
+  events: { name: string; amount: number }[];
+}
+
+export interface Forecast {
+  starting_balance: number;
+  safe_to_spend: number;
+  next_payday: string | null;
+  low_point: ForecastDay;
+  daily_variable_spend: number;
+  days: ForecastDay[];
 }
 
 export interface User {
