@@ -39,7 +39,7 @@ def test_bills_paychecks_and_daily_spend_add_up(db, user, account, card, categor
                         next_estimated_date=date(2026, 11, 10), is_active=True))
     # $600 of groceries over the last 60 days = $10 a day
     for i in range(6):
-        add_txn(db, account, categories["Food"], 100, TODAY - timedelta(days=5 + i * 9), merchant="Market")
+        add_txn(db, account, categories["Food"], 100, TODAY - timedelta(days=4 + i * 11), merchant="Market")
     # a transfer to savings is not spending
     add_txn(db, account, categories["Transfer"], 400, TODAY - timedelta(days=3), merchant="To savings")
     db.flush()
@@ -48,6 +48,7 @@ def test_bills_paychecks_and_daily_spend_add_up(db, user, account, card, categor
 
     assert f.starting_balance == 2000
     assert f.daily_variable_spend == 10
+    assert f.history_days == 60
     assert f.next_payday == date(2026, 11, 13)
     by_day = {d.date: d for d in f.days}
     assert by_day[date(2026, 11, 10)].balance == 2000 - 6 * 10 - 1200
@@ -74,6 +75,29 @@ def test_irregular_deposits_are_not_treated_as_pay(db, user, account, categories
         add_txn(db, account, categories["Income"], -300, TODAY - timedelta(days=days_back), merchant="Side gig")
     db.flush()
     assert build_forecast(db, user.id, today=TODAY).next_payday is None
+
+
+def test_new_account_averages_over_the_history_it_has(db, user, account, categories):
+    # linked 20 days ago: $400 of spending is $20 a day, not $400 / 60
+    for i in range(20):
+        add_txn(db, account, categories["Food"], 20, TODAY - timedelta(days=i), merchant="Market")
+    db.flush()
+
+    f = build_forecast(db, user.id, horizon_days=30, today=TODAY)
+
+    assert f.history_days == 20
+    assert f.daily_variable_spend == 20
+    assert f.safe_to_spend == 2500 - 30 * 20
+
+
+def test_a_few_days_of_history_uses_the_floor(db, user, account, categories):
+    add_txn(db, account, categories["Food"], 70, TODAY - timedelta(days=1), merchant="Market")
+    db.flush()
+
+    f = build_forecast(db, user.id, horizon_days=30, today=TODAY)
+
+    assert f.history_days == 14
+    assert f.daily_variable_spend == 5
 
 
 def test_demo_forecast_is_sensible(db):

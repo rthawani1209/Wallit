@@ -20,4 +20,5 @@ class ForecastResponse(BaseModel):
     next_payday: date | None
     low_point: ForecastDay
     daily_variable_spend: float
+    history_days: int
     days: list[ForecastDay]

@@ -7,7 +7,8 @@ what's owed on credit cards), then walks forward one day at a time:
 - paychecks land on theirs (recurring deposits in the Income category), and so
   do recurring transfers out to savings,
 - everything else is spread evenly as the average daily variable spend of the
-  last 60 days.
+  last 60 days, or of however much history there is if the bank was linked
+  more recently (history_days says which).
 
 Safe to spend is the lowest the balance gets before the next paycheck: you
 could spend that much extra today and still not go below zero by payday."""
@@ -25,6 +26,8 @@ from app.models.transaction import Transaction
 from app.services.detection import project_occurrences
 
 VARIABLE_LOOKBACK_DAYS = 60
+# A bank linked yesterday shouldn't have one coffee averaged over a single day.
+MIN_HISTORY_DAYS = 14
 INCOME_LOOKBACK_DAYS = 120
 MIN_PAYCHECKS = 3
 # Recurring transfers and pay aren't spending, so they stay out of the daily average.
@@ -48,6 +51,9 @@ class Day:
 class Forecast:
     starting_balance: float
     daily_variable_spend: float
+    # How many days of history the daily spend is averaged over. Under 60 means
+    # the account is new and the estimate is rougher.
+    history_days: int
     days: list[Day]
     next_payday: date | None
     safe_to_spend: float
@@ -152,7 +158,12 @@ def build_forecast(db: Session, user_id, horizon_days: int = 30, today: date | N
         and t.merchant_name not in recurring
         and category_names.get(t.category_id) not in NOT_SPENDING
     )
-    daily_variable = round(variable_total / VARIABLE_LOOKBACK_DAYS, 2)
+    # Divide by the days we actually have. Dividing a new account's two weeks of
+    # spending by 60 would understate it 4x and overstate safe to spend.
+    window_start = today - timedelta(days=VARIABLE_LOOKBACK_DAYS)
+    earliest = min((t.date for t in recent if t.date > window_start), default=today)
+    history_days = min(VARIABLE_LOOKBACK_DAYS, max(MIN_HISTORY_DAYS, (today - earliest).days + 1))
+    daily_variable = round(variable_total / history_days, 2)
 
     days = []
     for i in range(1, horizon_days + 1):
@@ -175,6 +186,7 @@ def build_forecast(db: Session, user_id, horizon_days: int = 30, today: date | N
     return Forecast(
         starting_balance=round(starting_balance(accounts), 2),
         daily_variable_spend=daily_variable,
+        history_days=history_days,
         days=days,
         next_payday=next_payday,
         safe_to_spend=max(0.0, low.balance),

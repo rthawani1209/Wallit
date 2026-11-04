@@ -181,6 +181,8 @@ export interface Forecast {
   next_payday: string | null;
   low_point: ForecastDay;
   daily_variable_spend: number;
+  // Days of history behind daily_variable_spend; under 60 means a newer account.
+  history_days: number;
   days: ForecastDay[];
 }
 
