@@ -24,6 +24,47 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+export type ChatEvent =
+  | { type: "tool"; name: string; label: string }
+  | { type: "text"; delta: string }
+  | { type: "done"; message: string };
+
+/** POST /chat/stream, calling onEvent for each server-sent event as it arrives.
+ * Resolves with the final reply. */
+async function streamChat(messages: ChatMessage[], onEvent: (event: ChatEvent) => void): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+  if (!res.ok || !res.body) {
+    const error = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // Events are separated by a blank line; keep any partial one for the next chunk.
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const data = chunk.split("\n").find((line) => line.startsWith("data: "));
+      if (!data) continue;
+      const event = JSON.parse(data.slice("data: ".length)) as ChatEvent;
+      if (event.type === "done") reply = event.message;
+      onEvent(event);
+    }
+  }
+  return reply;
+}
+
 export const api = {
   auth: {
     signup: (fields: {
@@ -142,6 +183,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ messages }),
       }),
+
+    stream: streamChat,
   },
 
   forecast: (days = 30) => request<Forecast>(`/api/v1/forecast?days=${days}`),

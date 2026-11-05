@@ -201,7 +201,7 @@ at `/docs` when the backend is running.
 | `subscriptions` | list, `calendar` |
 | `budgets` | `progress`, `PUT /{category_id}` |
 | `plans` | list, create, patch |
-| `chat` | post a conversation, get a reply |
+| `chat` | post a conversation, get a reply; `chat/stream` sends the same as server-sent events, with each tool call as it happens |
 | `simulate` | what-if projection |
 | `forecast` | day-by-day balance for the next 30-90 days and the safe-to-spend number |
 | `accounts`, `categories` | list |
