@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { DemoBanner } from "@/components/demo/DemoBanner";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <DemoBanner />
+        <PageViewTracker />
         {children}
       </body>
     </html>

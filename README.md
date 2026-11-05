@@ -201,15 +201,19 @@ at `/docs` when the backend is running.
 | `subscriptions` | list, `calendar` |
 | `budgets` | `progress`, `PUT /{category_id}` |
 | `plans` | list, create, patch |
-| `chat` | post a conversation, get a reply |
+| `chat` | post a conversation, get a reply; `chat/stream` sends the same as server-sent events, with each tool call as it happens |
 | `simulate` | what-if projection |
+| `forecast` | day-by-day balance for the next 30-90 days and the safe-to-spend number |
 | `accounts`, `categories` | list |
+| `events`, `admin/analytics` | page views from the frontend; usage numbers for emails in `ADMIN_EMAILS` (see `docs/ANALYTICS.md`) |
 
 ## What's not done
 
 - **No UI for multiple banks yet.** The backend keeps each linked bank separately
   (`plaid_items`, with its own token and sync cursor) and `GET /plaid/items` lists them, but
   the dashboard doesn't show the list or let you unlink one. That lands with the redesign.
+- **Safe to spend spots savings accounts by name.** Wallit doesn't store Plaid's account
+  subtype, so a savings account not named "savings" counts as spending money.
 - **No Plaid webhooks.** New transactions arrive on resync or the nightly sync, not live.
 - **Still on Plaid sandbox.** Going to production is mostly swapping keys, plus registering
   the OAuth redirect URI for banks like Chase that use it. `DEPLOYMENT.md` covers it.

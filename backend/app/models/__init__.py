@@ -8,3 +8,4 @@ from app.models.plan import Plan, PlanLineItem
 from app.models.subscription import Subscription
 from app.models.bill import Bill
 from app.models.budget import Budget
+from app.models.analytics_event import AnalyticsEvent

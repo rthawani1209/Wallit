@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.services import analytics
 from app.schemas.plans import PlanCreateRequest, PlanResponse, PlanUpdateRequest
 from app.services.plans import PlanError, create_plan, list_plans, to_response, update_plan
 
@@ -40,6 +41,7 @@ def post_plan(
         )
     except PlanError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    analytics.track(db, "plan_created", current_user, type=body.type)
     return to_response(plan)
 
 

@@ -3,6 +3,7 @@ calling read-only tools backed by real data instead of guessing, and can
 propose/apply budget and savings-goal changes once the user confirms."""
 import json
 import logging
+from collections.abc import Iterator
 from datetime import date, timedelta
 
 import anthropic
@@ -673,18 +674,54 @@ def _system_prompt() -> str:
     )
 
 
-def run_chat(db: Session, user: User, messages: list[dict]) -> str:
-    """Runs the tool-calling loop and returns the final reply text. `messages` is
-    the full conversation so far (list of {"role": ..., "content": str})."""
+# What the chat UI shows while a tool runs, so you can see the answer is coming
+# from your own data. Each takes the tool's result and returns a short line.
+TOOL_LABELS = {
+    "get_transactions": lambda r: f"Looked up {r.get('count', 0)} transactions",
+    "get_spending_by_category": lambda r: f"Totaled spending across {len(r.get('by_category', []))} categories",
+    "get_subscriptions_and_bills": lambda r: f"Checked {len(r.get('subscriptions', []))} recurring charges",
+    "get_upcoming_charges": lambda r: f"Found {len(r.get('charges', []))} upcoming charges",
+    "get_account_balances": lambda r: f"Read {len(r.get('accounts', []))} account balances",
+    "get_spending_anomalies": lambda r: f"Checked {len(r.get('anomalies', []))} unusual charges",
+    "check_affordability": lambda r: "Ran the numbers against upcoming bills",
+    "search_nearby_places": lambda r: "Searched nearby places",
+    "get_savings_goals": lambda r: f"Read {len(r.get('goals', []))} savings goals",
+    "create_savings_goal": lambda r: "Created a savings goal",
+    "update_savings_goal": lambda r: "Updated a savings goal",
+    "adjust_budget": lambda r: "Updated a budget",
+    "dismiss_subscription": lambda r: "Un-flagged a subscription",
+    "recategorize_transactions": lambda r: "Recategorized transactions",
+}
+
+
+def describe_tool(name: str, result: dict) -> str:
+    if isinstance(result, dict) and result.get("error"):
+        return f"{name.replace('_', ' ').capitalize()} failed"
+    label = TOOL_LABELS.get(name)
+    try:
+        return label(result) if label else name.replace("_", " ").capitalize()
+    except Exception:
+        return name.replace("_", " ").capitalize()
+
+
+def chat_events(db: Session, user: User, messages: list[dict]) -> Iterator[dict]:
+    """Runs the tool-calling loop, yielding events as they happen:
+    {"type": "tool", "name", "label"} after each tool call, {"type": "text",
+    "delta"} as reply text streams in, and finally {"type": "done", "message"}
+    with the whole reply. `messages` is the conversation so far (list of
+    {"role": ..., "content": str})."""
     if not settings.anthropic_api_key:
-        return "The AI assistant isn't configured on this server (missing Anthropic API key)."
+        msg = "The AI assistant isn't configured on this server (missing Anthropic API key)."
+        yield {"type": "done", "message": msg}
+        return
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     conversation: list[dict] = [{"role": m["role"], "content": m["content"]} for m in messages]
 
     for _ in range(MAX_TOOL_ITERATIONS):
+        parts: list[str] = []
         try:
-            response = client.messages.create(
+            with client.messages.stream(
                 model=MODEL,
                 max_tokens=1024,
                 # Breakpoint here covers tools + system (tools render first). The
@@ -692,15 +729,22 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
                 system=[{"type": "text", "text": _system_prompt(), "cache_control": {"type": "ephemeral"}}],
                 tools=TOOL_DEFINITIONS,
                 messages=conversation,
-            )
+            ) as stream:
+                for delta in stream.text_stream:
+                    parts.append(delta)
+                    yield {"type": "text", "delta": delta}
+                response = stream.get_final_message()
         except Exception:
             logger.exception("Claude chat call failed")
-            return "Sorry, I hit an error talking to the AI service. Please try again in a moment."
+            msg = "Sorry, I hit an error talking to the AI service. Please try again in a moment."
+            yield {"type": "done", "message": msg}
+            return
 
         if response.stop_reason != "tool_use":
-            text = "".join(block.text for block in response.content if block.type == "text").strip()
+            text = "".join(parts).strip()
             if text:
-                return text
+                yield {"type": "done", "message": text}
+                return
             # sometimes ends a turn with only a thinking block and no text — nudge it to finish
             conversation.append({"role": "assistant", "content": response.content})
             conversation.append({"role": "user", "content": "Please give your answer now."})
@@ -717,9 +761,18 @@ def run_chat(db: Session, user: User, messages: list[dict]) -> str:
             except Exception:
                 logger.exception("Tool %s failed with input %r", block.name, block.input)
                 result = {"error": "This tool failed to run."}
+            yield {"type": "tool", "name": block.name, "label": describe_tool(block.name, result)}
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}
             )
         conversation.append({"role": "user", "content": tool_results})
 
-    return "That took more steps than expected — could you narrow down the question a bit?"
+    yield {"type": "done", "message": "That took more steps than expected — could you narrow down the question a bit?"}
+
+
+def run_chat(db: Session, user: User, messages: list[dict]) -> str:
+    """The whole reply at once, for callers that don't stream."""
+    for event in chat_events(db, user, messages):
+        if event["type"] == "done":
+            return event["message"]
+    return ""

@@ -46,12 +46,19 @@ class Settings(BaseSettings):
     # Unset means 2 in production and 0 elsewhere.
     trusted_proxy_hops: int | None = None
 
+    # Comma-separated emails allowed to read usage numbers at /api/v1/admin/analytics.
+    admin_emails: str = ""
+
     class Config:
         env_file = ".env"
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def admin_email_list(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
 
     @property
     def is_production(self) -> bool:

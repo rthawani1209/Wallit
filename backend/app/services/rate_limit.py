@@ -58,8 +58,9 @@ login_email_limiter = SlidingWindowLimiter(limit=20, window_seconds=60 * 60)  # 
 signup_limiter = SlidingWindowLimiter(limit=5, window_seconds=60 * 60)  # per IP
 chat_limiter = SlidingWindowLimiter(limit=40, window_seconds=60 * 60)  # per user; each message is a paid call
 demo_limiter = SlidingWindowLimiter(limit=10, window_seconds=60 * 60)  # new demo sessions per IP
+events_limiter = SlidingWindowLimiter(limit=300, window_seconds=60 * 60)  # page views per IP
 
 
 def reset_all() -> None:
-    for limiter in (login_limiter, login_ip_limiter, login_email_limiter, signup_limiter, chat_limiter, demo_limiter):
+    for limiter in (login_limiter, login_ip_limiter, login_email_limiter, signup_limiter, chat_limiter, demo_limiter, events_limiter):
         limiter.reset()

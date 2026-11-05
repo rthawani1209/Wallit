@@ -24,6 +24,49 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+export type ChatEvent =
+  | { type: "tool"; name: string; label: string }
+  | { type: "text"; delta: string }
+  | { type: "done"; message: string };
+
+/** POST /chat/stream, calling onEvent for each server-sent event as it arrives.
+ * Resolves with the final reply. */
+async function streamChat(messages: ChatMessage[], onEvent: (event: ChatEvent) => void): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+  if (!res.ok || !res.body) {
+    const error = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply: string | null = null;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // Events are separated by a blank line; keep any partial one for the next chunk.
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const data = chunk.split("\n").find((line) => line.startsWith("data: "));
+      if (!data) continue;
+      const event = JSON.parse(data.slice("data: ".length)) as ChatEvent;
+      if (event.type === "done") reply = event.message;
+      onEvent(event);
+    }
+  }
+  // The server always finishes with `done`; without it the connection dropped.
+  if (reply === null) throw new Error("The reply was cut off. Please try again.");
+  return reply;
+}
+
 export const api = {
   auth: {
     signup: (fields: {
@@ -142,7 +185,22 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ messages }),
       }),
+
+    stream: streamChat,
   },
+
+  events: {
+    pageView: (page: string, visitor_id: string) =>
+      fetch(`${API_URL}/api/v1/events`, {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, visitor_id }),
+      }),
+  },
+
+  forecast: (days = 30) => request<Forecast>(`/api/v1/forecast?days=${days}`),
 
   simulate: (percentChange: number, categoryId?: string, range?: DateRange) => {
     const params = new URLSearchParams({ percent_change: String(percentChange) });
@@ -165,6 +223,23 @@ export interface PlaidItem {
   institution_name: string | null;
   account_count: number;
   last_synced_at: string | null;
+}
+
+export interface ForecastDay {
+  date: string;
+  balance: number;
+  events: { name: string; amount: number }[];
+}
+
+export interface Forecast {
+  starting_balance: number;
+  safe_to_spend: number;
+  next_payday: string | null;
+  low_point: ForecastDay;
+  daily_variable_spend: number;
+  // Days of history behind daily_variable_spend; under 60 means a newer account.
+  history_days: number;
+  days: ForecastDay[];
 }
 
 export interface User {
