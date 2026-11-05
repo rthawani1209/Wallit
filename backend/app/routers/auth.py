@@ -9,7 +9,7 @@ from app.dependencies import get_current_user
 from app.models.linked_identity import LinkedIdentity
 from app.models.user import User
 from app.schemas.auth import LoginRequest, SignupRequest, UserResponse
-from app.services import google_oauth
+from app.services import analytics, google_oauth
 from app.services.client_ip import client_ip
 from app.services.rate_limit import login_email_limiter, login_ip_limiter, login_limiter, signup_limiter
 from app.services.auth import create_access_token, create_oauth_state, hash_password, verify_oauth_state, verify_password
@@ -51,6 +51,8 @@ def signup(body: SignupRequest, request: Request, response: Response, db: Sessio
     db.commit()
     db.refresh(user)
 
+    analytics.track(db, "signup", user, method="password")
+
     # Issue JWT immediately so the user is logged in right after signing up
     _set_auth_cookie(response, str(user.id))
     return user
@@ -75,6 +77,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
     if not user or not user.password_hash or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    analytics.track(db, "login", user, method="password")
     _set_auth_cookie(response, str(user.id))
     return user
 
@@ -144,8 +147,10 @@ def google_callback(code: str, state: str, db: Session = Depends(get_db)):
             db.add(user)
             db.commit()
             db.refresh(user)
+            analytics.track(db, "signup", user, method="google")
         db.add(LinkedIdentity(user_id=user.id, provider="google", provider_user_id=google_id))
         db.commit()
+    analytics.track(db, "login", user, method="google")
 
     redirect = RedirectResponse(f"{settings.frontend_url}/dashboard")
     _set_auth_cookie(redirect, str(user.id))

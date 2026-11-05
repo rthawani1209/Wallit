@@ -10,6 +10,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.chat import ChatRequest, ChatResponse
+from app.services import analytics
 from app.services.chat import chat_events, run_chat
 from app.services.demo import DEMO_CHAT_LIMIT
 from app.services.rate_limit import chat_limiter
@@ -27,7 +28,7 @@ DEMO_LIMIT_REPLY = (
 STREAM_ERROR_REPLY = "Sorry, something went wrong on our end. Please try again in a moment."
 
 
-def _admit(body: ChatRequest, user: User, db: Session) -> list[dict] | None:
+def _admit(body: ChatRequest, user: User, db: Session, *, streamed: bool) -> list[dict] | None:
     """Validates the request and applies the limits. Returns the messages to send,
     or None when a demo user is out of messages."""
     if not body.messages:
@@ -44,6 +45,7 @@ def _admit(body: ChatRequest, user: User, db: Session) -> list[dict] | None:
         user.demo_chat_count += 1
         db.commit()
 
+    analytics.track(db, "chat_message", user, streamed=streamed)
     return [m.model_dump() for m in body.messages[-MAX_MESSAGES:]]
 
 
@@ -53,7 +55,7 @@ def post_chat(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    messages = _admit(body, current_user, db)
+    messages = _admit(body, current_user, db, streamed=False)
     if messages is None:
         return ChatResponse(message=DEMO_LIMIT_REPLY)
     return ChatResponse(message=run_chat(db, current_user, messages))
@@ -73,7 +75,7 @@ def stream_chat(
     assistant looks something up, `text` events as the reply is written, then
     `done` with the full reply. Text streamed before a tool event was the
     assistant thinking out loud; the UI can fold it into the trace."""
-    messages = _admit(body, current_user, db)
+    messages = _admit(body, current_user, db, streamed=True)
     user_id = current_user.id
 
     def events() -> Iterator[str]:

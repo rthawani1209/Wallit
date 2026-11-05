@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.user import User
 from app.routers.auth import _set_auth_cookie
 from app.schemas.auth import UserResponse
-from app.services import demo
+from app.services import analytics, demo
 from app.services.auth import decode_access_token
 from app.services.client_ip import client_ip
 from app.services.rate_limit import demo_limiter
@@ -35,5 +35,6 @@ def start_demo_session(
     demo.evict_oldest_demo_users(db, keep=demo.MAX_LIVE_DEMO_USERS - 1)
 
     user = demo.create_demo_user(db)
+    analytics.track(db, "demo_started", user)
     _set_auth_cookie(response, str(user.id))
     return user

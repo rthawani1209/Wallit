@@ -12,6 +12,7 @@ from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.services import analytics
 from app.schemas.transactions import (
     CashFlowMonth,
     CategorySpend,
@@ -69,6 +70,7 @@ def update_transaction(
     transaction.category_is_manual = True
     db.commit()
     db.refresh(transaction)
+    analytics.track(db, "transaction_recategorized", current_user)
     return transaction
 
 

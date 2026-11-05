@@ -22,6 +22,8 @@ Every command runs from `backend/` against a throwaway Postgres (see `scripts/ch
 | The demo can't touch Plaid, caps assistant messages and rate-limits new sessions per IP | `test_demo.py::test_demo_users_cannot_touch_plaid`, `::test_demo_chat_is_capped`, `::test_new_demo_sessions_are_rate_limited_per_ip` | `pytest tests/test_demo.py -k "plaid or capped or rate"` |
 | Login, signup and the assistant are rate limited (logins: 10 per 15 min per IP and email, 50 per 15 min per IP, 20 per hour per email; 5 signups per hour per IP, 40 assistant messages per hour per user), and the limiter drops idle keys so it can't grow without bound | `backend/tests/test_rate_limit.py` | `pytest tests/test_rate_limit.py` |
 | The assistant streams its reply and reports each tool it runs (e.g. "Looked up 42 transactions") as server-sent events, with the same rate and demo limits as the plain endpoint | `backend/tests/test_chat_stream.py` (scripted fake Claude: tool events, text deltas, failing tool, SSE endpoint, demo cap) | `pytest tests/test_chat_stream.py` |
+| Compared with the code before this work (`70050e4`), in a benchmark against a simulated bank with 1,128 transactions: resync takes 0.04 s instead of 10.38 s, makes 1 Plaid request instead of 17 and 32 SQL statements instead of 1,156; stored spending matches the bank instead of being $455 too high; 25 wrong passwords hit the limit after 10 instead of all going through | `docs/BENCHMARKS.md`, `scripts/benchmarks/before_after.py` | `scripts/benchmarks/run.sh` |
+| Usage analytics are first-party (own Postgres table), store no amounts, merchants or emails, honor Do Not Track for page views, and keep demo accounts apart from real ones | `backend/tests/test_analytics.py`, `docs/ANALYTICS.md` | `pytest tests/test_analytics.py` |
 | CI blocks deploys: lint, typecheck, build, import check, migrations on a fresh database, and the test suite | `.github/workflows/ci.yml`, `scripts/check.sh` | `scripts/check.sh` |
 
 ## Known tradeoffs
@@ -29,4 +31,5 @@ Every command runs from `backend/` against a throwaway Postgres (see `scripts/ch
 
 ## Not claimable yet
 - Tool use against the live Claude API and prompt caching aren't tested automatically; the tests use a scripted fake of the API. An eval with recorded cache-hit numbers is on the plan.
-- Performance numbers (sync time, demo creation time) need a committed benchmark results file before they're quoted.
+- Benchmark numbers come from a simulated bank, not real Plaid, so say "in a benchmark". Real Plaid adds network time to every page.
+- Usage numbers (users, adoption, funnel) only exist from the day migration 0015 was deployed. Quote them from `scripts/analytics_report.py`, with the date range.

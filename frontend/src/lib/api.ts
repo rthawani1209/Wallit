@@ -189,6 +189,17 @@ export const api = {
     stream: streamChat,
   },
 
+  events: {
+    pageView: (page: string, visitor_id: string) =>
+      fetch(`${API_URL}/api/v1/events`, {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, visitor_id }),
+      }),
+  },
+
   forecast: (days = 30) => request<Forecast>(`/api/v1/forecast?days=${days}`),
 
   simulate: (percentChange: number, categoryId?: string, range?: DateRange) => {

@@ -3,9 +3,9 @@
 Every number here comes from `scripts/benchmarks/run.sh`. Both versions are measured the same way, on the same machine, against the same simulated bank.
 
 - **Before:** `70050e4`, the last commit before the work that started on Oct 27, 2026.
-- **After:** `781ab26`, the head of PR #3. Current `main` (`e06a102`) gives the same numbers, because PR #3 doesn't touch sync or login.
+- **After:** `781ab26`, the head of PR #3. Current `main` (`e06a102`) gives the same numbers, because PR #3 doesn't touch sync or login. Later commits record an analytics event on link and resync, which adds 2 SQL statements to each (34 per resync) and nothing measurable to the time.
 
-Measured on Nov 5, 2026 in a Linux container with Postgres 16 and Python 3.12. Running the script again gives the same counts. Times move by a few hundredths of a second.
+Measured on Nov 5, 2026 in a Linux container with Postgres 16 and Python 3.12. Each version was run 2 to 3 times. The counts were identical every run, because the fake bank is seeded. The times shown are from one run, and the other runs were within 0.2 s. Login timing is the median of 15 attempts.
 
 ## Results
 
@@ -33,7 +33,7 @@ Measured on Nov 5, 2026 in a Linux container with Postgres 16 and Python 3.12. R
 - **Spending accuracy.**
   - Before, sync read only Plaid's `added` list. A pending card charge that later posted under a new id was stored twice, and a merchant's correction to a charge was dropped.
   - `ddb1e52` handles `modified` and `removed`.
-  - In this run, the 8 pending charges that posted overnight were counted twice, and one $10 correction was lost. Together that adds up to $455.46.
+  - In this run, the 8 pending charges ($465.46) stayed in the database next to their posted copies, so they were counted twice. The $10 correction was missed as well. $465.46 − $10.00 = $455.46 too high.
 - **Brute force.** `01d31d3` and `c3068ff` cap login attempts at 10 per IP and email pair. There are looser caps per IP and per email.
 - **Login timing.** Before, an unknown email skipped the password hash, so it answered about 70 times faster. That tells an attacker which emails have accounts. `ab8c5ba` runs one bcrypt check either way.
 - **Tests and lint.**
@@ -51,7 +51,7 @@ The fake bank holds:
 - the last 8 card charges still pending.
 
 "One day passes" then does three things:
-- posts those 8 charges under new ids, adding a tip to one;
+- posts those 8 charges under new ids (a Chipotle charge would also get a tip, but this seed has none pending);
 - adds 5 new purchases;
 - changes one older charge by $10.
 

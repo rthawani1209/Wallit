@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import (
     accounts,
+    analytics,
     auth,
     budgets,
     categories,
@@ -52,6 +53,7 @@ app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(plans.router, prefix="/api/v1")
 app.include_router(demo.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 
 
 @app.get("/health")

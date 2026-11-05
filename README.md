@@ -205,6 +205,7 @@ at `/docs` when the backend is running.
 | `simulate` | what-if projection |
 | `forecast` | day-by-day balance for the next 30-90 days and the safe-to-spend number |
 | `accounts`, `categories` | list |
+| `events`, `admin/analytics` | page views from the frontend; usage numbers for emails in `ADMIN_EMAILS` (see `docs/ANALYTICS.md`) |
 
 ## What's not done
 

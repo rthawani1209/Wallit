@@ -7,6 +7,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.transactions import BudgetProgress, BudgetSetRequest
+from app.services import analytics
 from app.services.budgets import BudgetUpsertError, get_budget_progress, upsert_budget
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
@@ -26,6 +27,8 @@ def set_budget(
 ):
     """Set (or update) a user's monthly limit for a category — the 'Manage' flow."""
     try:
-        return upsert_budget(db, current_user, category_id, body.limit)
+        result = upsert_budget(db, current_user, category_id, body.limit)
     except BudgetUpsertError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    analytics.track(db, "budget_set", current_user)
+    return result

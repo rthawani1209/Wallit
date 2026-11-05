@@ -21,6 +21,10 @@ export default function PrivacyPage() {
         name and email from Google to create or match your account.</li>
         <li><strong>What you tell the AI assistant</strong> — messages you send to Wallit&apos;s
         assistant, and the real account data it looks up on your behalf to answer you.</li>
+        <li><strong>Usage events</strong>: which pages you open and which features you use
+        (for example, that you set a budget, but not the amount), with a random id your browser
+        keeps. These stay in our own database and are used only to see how Wallit is used.
+        If your browser sends Do Not Track or Global Privacy Control, we skip page views.</li>
       </ul>
 
       <h2>How we use it</h2>
