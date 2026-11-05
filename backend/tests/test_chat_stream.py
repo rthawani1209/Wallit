@@ -131,3 +131,18 @@ def test_stream_endpoint_rejects_a_bad_request(client):
     client.post("/api/v1/demo/session")
     r = client.post("/api/v1/chat/stream", json={"messages": [{"role": "assistant", "content": "hi"}]})
     assert r.status_code == 422
+
+
+def test_stream_still_ends_with_done_when_something_breaks(client, monkeypatch):
+    client.post("/api/v1/demo/session")
+
+    def breaks_partway(db, user, messages):
+        yield {"type": "tool", "name": "get_transactions", "label": "Looked up 3 transactions"}
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr("app.routers.chat.chat_events", breaks_partway)
+
+    events = _parse_sse(client.post("/api/v1/chat/stream", json={"messages": ASK}).text)
+
+    assert [e["type"] for e in events] == ["tool", "done"]
+    assert "went wrong" in events[-1]["message"]

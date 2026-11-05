@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,8 @@ from app.services.chat import chat_events, run_chat
 from app.services.demo import DEMO_CHAT_LIMIT
 from app.services.rate_limit import chat_limiter
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 MAX_MESSAGES = 40
@@ -20,6 +23,8 @@ DEMO_LIMIT_REPLY = (
     f"That's the {DEMO_CHAT_LIMIT}-message limit for a demo session, since every reply is a "
     "live Claude call. Sign up to keep going with your own data."
 )
+
+STREAM_ERROR_REPLY = "Sorry, something went wrong on our end. Please try again in a moment."
 
 
 def _admit(body: ChatRequest, user: User, db: Session) -> list[dict] | None:
@@ -75,13 +80,20 @@ def stream_chat(
         # On this FastAPI version the get_db session is closed before a streaming
         # body runs. A closed Session reopens on first use, so close it again here
         # to hand the connection back once the reply is finished.
+        # The client relies on every stream ending with `done`, so anything that
+        # goes wrong here still sends one.
         try:
             if messages is None:
                 yield _sse({"type": "done", "message": DEMO_LIMIT_REPLY})
                 return
             user = db.get(User, user_id)
+            if user is None:
+                raise LookupError(f"user {user_id} disappeared mid-request")
             for event in chat_events(db, user, messages):
                 yield _sse(event)
+        except Exception:
+            logger.exception("Chat stream failed")
+            yield _sse({"type": "done", "message": STREAM_ERROR_REPLY})
         finally:
             db.close()
 

@@ -46,7 +46,7 @@ async function streamChat(messages: ChatMessage[], onEvent: (event: ChatEvent) =
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let reply = "";
+  let reply: string | null = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -62,6 +62,8 @@ async function streamChat(messages: ChatMessage[], onEvent: (event: ChatEvent) =
       onEvent(event);
     }
   }
+  // The server always finishes with `done`; without it the connection dropped.
+  if (reply === null) throw new Error("The reply was cut off. Please try again.");
   return reply;
 }
 
